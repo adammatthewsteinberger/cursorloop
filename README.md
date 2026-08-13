@@ -22,13 +22,16 @@ retargeted onto the Cursor Agent SDK (`cursor-sdk`). **No Anthropic dependency.*
 
 ## Status (honest)
 
-**Pre-1.0 / mid-implementation.** Domain + application runner + Cursor agent
-adapters + supporting control-plane infra are in place and covered by tests.
-The operator CLI composition root (`bootstrap` / Typer commands / `doctor`) is
-still landing — the console script currently exits 0 as a packaging stub.
+**Pre-1.0.** Plan Tasks 1–20 are implemented on branch: Typer CLI (`run` /
+`resume` / `doctor` / mid-run control), bootstrap wiring, deterministic
+`pytest -m system` harness, Cloud Agents REST **partial** sketch (ADR-0006
+deferral), CLI-fallback gateway, docs site, and mirrored agent skills.
+
+Live SDK runs still need `CURSOR_API_KEY` and a working bridge; use the
+scripted test-agent gate for offline end-to-end checks.
 
 See the [implementation plan](docs/superpowers/plans/2026-08-13-cursorloop-implementation.md)
-for remaining tasks (CLI, doctor, M3 UX, optional M4/M5 sketches).
+and [docs site](docs/index.md) (`mkdocs serve`).
 
 ## Install (from source)
 
