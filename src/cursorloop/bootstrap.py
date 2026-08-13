@@ -7,6 +7,7 @@ from application/ and its concrete infrastructure implementation.
 
 from __future__ import annotations
 
+import os
 import uuid
 from dataclasses import dataclass
 from datetime import timedelta
@@ -18,6 +19,7 @@ from cursorloop.application.runner import AutonomousRunner, RunnerContext
 from cursorloop.domain.budget import Budget
 from cursorloop.domain.model_profile import SHIPPED_PRESETS, ModelProfile
 from cursorloop.domain.waiting import DEFAULT_WAIT_POLICY_CONFIG
+from cursorloop.infrastructure.agent.bridge import LiveBridge, open_live_bridge
 from cursorloop.infrastructure.agent.catalog import CursorAgentCatalog
 from cursorloop.infrastructure.agent.gateway import CursorAgentGateway
 from cursorloop.infrastructure.agent.hooks import ManagedHooks
@@ -55,6 +57,12 @@ class BuiltRunner:
     run_dir: RunDirectory
     run_id: str
     trace_id: str
+    bridge: LiveBridge | None = None
+
+    def close(self) -> None:
+        """Release the SDK bridge client when bootstrap owns it."""
+        if self.bridge is not None:
+            self.bridge.close()
 
 
 def resolve_profile(config: RunnerConfig) -> ModelProfile:
@@ -72,8 +80,13 @@ def build_runner(
     plan_path: Path | None = None,
     resume_agent_id: str | None = None,
     client: Any | None = None,
+    launch_bridge: Any | None = None,
 ) -> BuiltRunner:
-    """Assemble an AutonomousRunner for a fresh or resumed run."""
+    """Assemble an AutonomousRunner for a fresh or resumed run.
+
+    When the scripted test-agent gate is off and no ``client`` is supplied,
+    launches ``CursorClient.launch_bridge(workspace=…)`` automatically.
+    """
     run_dir = RunDirectory.create(runs_root_for(cwd), cwd=cwd, plan_path=plan_path)
     run_id = run_dir.read_meta().run_id
     trace_id = str(uuid.uuid4())
@@ -94,29 +107,32 @@ def build_runner(
     scripted = resolve_test_agent_from_env()
     gateway: AgentGateway
     probe: CapacityProbe
+    bridge: LiveBridge | None = None
     if scripted is not None:
         gateway, probe = scripted
     else:
-        if client is None:
+        if not config.api_key and client is None and not os.environ.get("CURSOR_API_KEY"):
             raise RuntimeError(
-                "No Cursor client available. Set CURSOR_API_KEY and use the "
-                "SDK bridge, or enable the test-agent gate "
+                "CURSOR_API_KEY is unset. Export it from the Cursor dashboard, "
+                "or enable the test-agent gate "
                 "(CURSORLOOP_ALLOW_TEST_AGENT=1 and CURSORLOOP_TEST_AGENT_SCRIPT)."
             )
+        bridge = open_live_bridge(
+            workspace=cwd,
+            profile=profile,
+            api_key=config.api_key,
+            resume_agent_id=resume_agent_id,
+            client=client,
+            launch_bridge=launch_bridge,
+        )
         watchdog = TurnWatchdog(
             turn_timeout=timedelta(minutes=30),
             stall_timeout=timedelta(minutes=10),
             clock=clock,
         )
-        if resume_agent_id:
-            agent = client.agents.get(agent_id=resume_agent_id, cwd=str(cwd))
-            # Resume path is SDK-specific; keep opaque for bootstrap.
-            live_agent = getattr(agent, "resume", lambda: agent)()
-        else:
-            live_agent = client.agents.create(cwd=str(cwd), model=profile.model_id)
         gateway = CursorAgentGateway(
-            client=client,
-            agent=live_agent,
+            client=bridge.client,
+            agent=bridge.agent,
             profile=profile,
             watchdog=watchdog,
             event_sink=event_sink,
@@ -161,6 +177,7 @@ def build_runner(
         run_dir=run_dir,
         run_id=run_id,
         trace_id=trace_id,
+        bridge=bridge,
     )
 
 

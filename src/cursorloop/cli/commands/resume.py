@@ -31,10 +31,13 @@ async def _resume(
     cwd = cwd_dir.resolve() if cwd_dir is not None else Path.cwd()
     config = load_config()
     built = bootstrap.build_runner(cwd=cwd, config=config, plan_path=plan, resume_agent_id=agent_id)
-    if plan is not None:
-        result = await run_from_plan_file(built.runner, plan)
-    else:
-        result = await built.runner.run(autonomy_preamble() + "Continue the unfinished work.")
+    try:
+        if plan is not None:
+            result = await run_from_plan_file(built.runner, plan)
+        else:
+            result = await built.runner.run(autonomy_preamble() + "Continue the unfinished work.")
+    finally:
+        built.close()
     if not result.success:
         typer.echo(f"Run failed: {result.reason}", err=True)
         raise typer.Exit(code=exit_code_for(result))

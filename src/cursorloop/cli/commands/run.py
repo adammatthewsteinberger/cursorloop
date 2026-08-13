@@ -100,8 +100,11 @@ async def _run(
             raise typer.Exit(code=1) from exc
         raise typer.Exit(code=1) from exc
 
-    typer.echo(f"Run id: {built.run_id}", err=True)
-    result = await run_from_plan_file(built.runner, plan)
+    try:
+        typer.echo(f"Run id: {built.run_id}", err=True)
+        result = await run_from_plan_file(built.runner, plan)
+    finally:
+        built.close()
     if not result.success:
         typer.echo(f"Run failed: {result.reason}", err=True)
         raise typer.Exit(code=exit_code_for(result))
