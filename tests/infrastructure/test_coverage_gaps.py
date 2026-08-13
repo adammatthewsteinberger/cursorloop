@@ -264,6 +264,7 @@ def test_audit_record_without_bound_ids(tmp_path: Path) -> None:
 
 
 def test_config_edge_cases(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.delenv("CURSOR_API_KEY", raising=False)
     monkeypatch.setenv("CURSORLOOP_LOG_LEVEL", "WARNING")
     monkeypatch.setenv("CURSORLOOP_MANAGED_HOOKS", "yes")
     monkeypatch.setenv("CURSORLOOP_UNUSED_FLAG", "x")

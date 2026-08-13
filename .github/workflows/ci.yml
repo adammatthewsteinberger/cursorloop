@@ -90,17 +90,17 @@ jobs:
           --cov=cursorloop.application
           --cov-report=term-missing
           --cov-fail-under=100
-      - name: Infrastructure coverage floor (85%)
+      - name: Infrastructure coverage floor (100%)
         run: >
           pytest tests
           --cov=cursorloop.infrastructure
           --cov-report=term-missing
-          --cov-fail-under=85
-      - name: CLI coverage floor (85%)
+          --cov-fail-under=100
+      - name: CLI coverage floor (100%)
         run: >
           pytest tests
           --cov=cursorloop.cli
           --cov-report=term-missing
-          --cov-fail-under=85
+          --cov-fail-under=100
       - name: Full suite
         run: pytest

@@ -10,6 +10,7 @@ lookalikes) become ``TurnSignals`` via ``signals_from_exception``.
 
 from __future__ import annotations
 
+import contextlib
 from dataclasses import replace
 from typing import Any
 
@@ -70,7 +71,10 @@ class CursorAgentGateway:
     async def close(self) -> None:
         closer = getattr(self._agent, "close", None)
         if callable(closer):
-            closer()
+            # Bridge may have already disposed the agent (or the live process
+            # already tore it down after a capacity error).
+            with contextlib.suppress(Exception):
+                closer()
 
     async def cancel_active_run(self) -> bool:
         run = self._active_run
@@ -90,7 +94,11 @@ class CursorAgentGateway:
             self._watchdog.turn_started(run)
             tee = TeeStream(run, sink=self._event_sink, turn_id=str(getattr(run, "id", "") or ""))
             buffered = await self._drain_while_watching(run, tee)
-            outcome = outcome_from_run(run, buffered)
+            outcome = outcome_from_run(
+                run,
+                buffered,
+                signals_fallback=tee.status_error_text,
+            )
             return replace(outcome, raw_events=tuple(tee.raw_events))
         except Exception as exc:
             if _is_cursor_agent_error(exc):

@@ -78,3 +78,35 @@ async def test_probe_unexpected_errors_propagate() -> None:
     probe = CursorCapacityProbe("/repo", SHIPPED_PRESETS["composer"], prompt=prompt)
     with pytest.raises(RuntimeError, match="bridge down"):
         await probe.probe()
+
+
+async def test_streamed_probe_surfaces_status_error_text() -> None:
+    run = sdk_payloads.fake_run(
+        status="error",
+        result="",
+        messages=(
+            sdk_payloads.fake_status_message(
+                status="ERROR",
+                message="You're out of usage. Switch to Auto.",
+            ),
+        ),
+    )
+    agent = type(
+        "ProbeAgent",
+        (),
+        {
+            "send": lambda self, message, *a, **k: run,
+            "close": lambda self: None,
+        },
+    )()
+
+    probe = CursorCapacityProbe(
+        "/repo",
+        SHIPPED_PRESETS["composer"],
+        create_agent=lambda **kwargs: agent,
+        use_streamed_probe=True,
+    )
+    outcome = await probe.probe()
+    assert outcome.signals.run_status == "error"
+    assert "out of usage" in outcome.signals.result_text.lower()
+    assert outcome.output_text == ""

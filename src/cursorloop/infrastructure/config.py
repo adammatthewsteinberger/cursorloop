@@ -34,6 +34,8 @@ class RunnerConfig:
     max_wait_seconds: float | None = None
     max_turns: int | None = None
     max_dollars: float | None = None
+    turn_timeout_seconds: float | None = None
+    stall_timeout_seconds: float | None = None
     log_level: str = "INFO"
     log_file: str | None = None
     model: str | None = None
@@ -65,6 +67,10 @@ def _from_env() -> tuple[dict[str, Any], frozenset[str]]:
             overrides["max_turns"] = int(value)
         elif suffix == "max_dollars":
             overrides["max_dollars"] = float(value)
+        elif suffix == "turn_timeout":
+            overrides["turn_timeout_seconds"] = float(value)
+        elif suffix == "stall_timeout":
+            overrides["stall_timeout_seconds"] = float(value)
         elif suffix == "log_level":
             overrides["log_level"] = value
         elif suffix == "log_file":
@@ -99,6 +105,8 @@ def _from_file(path: Path) -> dict[str, Any]:
         "max_wait_seconds": "max_wait_seconds",
         "max_turns": "max_turns",
         "max_dollars": "max_dollars",
+        "turn_timeout": "turn_timeout_seconds",
+        "stall_timeout": "stall_timeout_seconds",
         "log_level": "log_level",
         "log_file": "log_file",
         "model": "model",
