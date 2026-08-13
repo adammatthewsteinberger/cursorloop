@@ -31,8 +31,48 @@ def test_rate_limit_lexicon_matches_counter_terms() -> None:
 
 
 def test_default_billing_terms_include_all_tiers_in_order() -> None:
-    assert DEFAULT_BILLING_TERMS[0] == "out_of_credits"
-    assert DEFAULT_BILLING_TERMS[-1] == "trial_ended"
+    assert DEFAULT_BILLING_TERMS == (
+        "out_of_credits",
+        "credits_required",
+        "insufficient_credits",
+        "no_credits",
+        "credit_balance",
+        "credit_balance_exhausted",
+        "add_credits",
+        "purchase_credits",
+        "top_up",
+        "topup_required",
+        "usage_limit",
+        "usage_limit_reached",
+        "usage_limit_exceeded",
+        "usage_exceeded",
+        "included_usage",
+        "plan_limit",
+        "plan_quota",
+        "plan_exhausted",
+        "quota_exceeded",
+        "monthly_limit",
+        "monthly_quota",
+        "request_limit_reached",
+        "usage_not_included",
+        "spend_limit",
+        "spending_limit",
+        "hard_limit",
+        "budget_exceeded",
+        "cap_reached",
+        "spend_cap",
+        "admin_limit",
+        "team_limit",
+        "payment_required",
+        "payment_failed",
+        "billing",
+        "billing_error",
+        "upgrade_required",
+        "subscription_expired",
+        "subscription_inactive",
+        "trial_expired",
+        "trial_ended",
+    )
 
 
 def test_default_rate_limit_terms_match_research_notes() -> None:

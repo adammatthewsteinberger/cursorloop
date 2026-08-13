@@ -49,6 +49,19 @@ def test_unparseable_value_returns_none() -> None:
     assert parse_retry_after("not-a-date-or-seconds", now=NOW) is None
 
 
+def test_nan_seconds_returns_none_not_raises() -> None:
+    assert parse_retry_after("nan", now=NOW) is None
+
+
+def test_overflow_seconds_returns_none_not_raises() -> None:
+    assert parse_retry_after("1e300", now=NOW) is None
+
+
+def test_http_date_with_naive_now_never_raises() -> None:
+    naive_now = datetime(2026, 8, 13, 12, 0, 0)
+    assert parse_retry_after("Wed, 13 Aug 2026 14:05:00 GMT", now=naive_now) is None
+
+
 @given(st.text())
 def test_never_raises_on_arbitrary_input(value: str) -> None:
     """A multi-hour unattended run must not die on a malformed header."""
