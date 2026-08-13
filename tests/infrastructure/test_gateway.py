@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import threading
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from types import SimpleNamespace
 from typing import Any
 
+import anyio
 import pytest
 
 from cursorloop.application.ports import AgentGateway
@@ -193,6 +195,41 @@ async def test_cancel_active_run_is_false_when_nothing_is_running() -> None:
     assert await gateway.cancel_active_run() is False
     await gateway.send_turn("go")
     assert await gateway.cancel_active_run() is False
+
+
+def test_watchdog_cancels_a_stalled_in_flight_stream() -> None:
+    """A model that stops emitting holds messages() forever. The watchdog must
+    tick while drain is in flight so cancel unblocks send_turn — Cursor has no
+    ask-user tool, so this is the stall path that must stay survivable."""
+    clock = fakes.FakeClock()
+    run = fakes.FakeRun(status="running", block_until_cancel=True)
+    watchdog = TurnWatchdog(
+        turn_timeout=timedelta(hours=2), stall_timeout=timedelta(minutes=10), clock=clock
+    )
+    gateway = CursorAgentGateway(
+        client=object(),
+        agent=FakeCursorAgent(run=run),
+        profile=SHIPPED_PRESETS["composer"],
+        watchdog=watchdog,
+        event_sink=FakeRunEventSink(),
+    )
+    holder: list[object] = []
+
+    def runner() -> None:
+        holder.append(anyio.run(gateway.send_turn, "go"))
+
+    thread = threading.Thread(target=runner)
+    thread.start()
+    try:
+        assert run.block_entered.wait(timeout=2)
+        clock.advance(timedelta(minutes=11))
+        thread.join(timeout=2)
+        assert run.cancel_calls == 1
+        assert thread.is_alive() is False
+        assert holder
+    finally:
+        run.cancel()
+        thread.join(timeout=1)
 
 
 async def test_raw_events_from_the_tee_land_on_the_outcome() -> None:

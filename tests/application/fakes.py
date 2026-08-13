@@ -4,7 +4,9 @@ Protocols, so no test ever waits on a human or calls time.sleep() for real.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
+from threading import Event
 from typing import Any
 
 from cursorloop.application.dto import TurnOutcome
@@ -84,16 +86,38 @@ class FakeSleeper:
 
 
 class FakeRun:
-    """Synthetic Run handle for the stall watchdog. Not unittest.mock."""
+    """Synthetic Run handle for the stall watchdog. Not unittest.mock.
 
-    def __init__(self, status: str = "running") -> None:
+    ``block_until_cancel=True`` makes ``messages()`` wait until ``cancel()``,
+    so a hung stream is testable without a live SDK.
+    """
+
+    def __init__(self, status: str = "running", *, block_until_cancel: bool = False) -> None:
         self.status = status
         self.cancel_calls = 0
+        self._block_until_cancel = block_until_cancel
+        self._released = Event()
+        self.block_entered = Event()
+        if not block_until_cancel:
+            self._released.set()
 
     def cancel(self) -> None:
         self.cancel_calls += 1
         if self.status == "running":
             self.status = "cancelled"
+        self._released.set()
+
+    def messages(self) -> Iterator[object]:
+        if self._block_until_cancel:
+            self.block_entered.set()
+            self._released.wait()
+        yield from ()
+
+    def wait(self) -> FakeRun:
+        if self._block_until_cancel:
+            self.block_entered.set()
+            self._released.wait()
+        return self
 
 
 class FakeAgentGateway:

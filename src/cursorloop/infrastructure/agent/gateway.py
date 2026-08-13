@@ -13,6 +13,7 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import Any
 
+import anyio
 from cursor_sdk import LocalSendOptions, SendOptions
 
 from cursorloop.application.dto import TurnOutcome
@@ -28,6 +29,7 @@ from cursorloop.infrastructure.agent.translate import (
 from cursorloop.infrastructure.agent.watchdog import TurnWatchdog
 
 _RUNNING = "running"
+_WATCH_INTERVAL_SECONDS = 0.05
 
 
 def _is_cursor_agent_error(exc: BaseException) -> bool:
@@ -87,8 +89,7 @@ class CursorAgentGateway:
             self._active_run = run
             self._watchdog.turn_started(run)
             tee = TeeStream(run, sink=self._event_sink, turn_id=str(getattr(run, "id", "") or ""))
-            buffered = tee.drain()
-            await self._watchdog.tick()
+            buffered = await self._drain_while_watching(run, tee)
             outcome = outcome_from_run(run, buffered)
             return replace(outcome, raw_events=tuple(tee.raw_events))
         except Exception as exc:
@@ -104,6 +105,29 @@ class CursorAgentGateway:
             raise
         finally:
             self._reassert_profile()
+
+    async def _drain_while_watching(self, run: object, tee: TeeStream) -> str:
+        """Tick the watchdog while drain blocks in another thread.
+
+        A hung ``messages()``/``wait()`` must not freeze ticks: stall/turn
+        timeout has to call ``run.cancel()`` on a still-running handle.
+        """
+
+        async def watch() -> None:
+            while getattr(run, "status", None) == _RUNNING:
+                await self._watchdog.tick()
+                if getattr(run, "status", None) != _RUNNING:
+                    return
+                await anyio.sleep(_WATCH_INTERVAL_SECONDS)
+
+        buffered = ""
+        async with anyio.create_task_group() as tg:
+            tg.start_soon(watch)
+            try:
+                buffered = await anyio.to_thread.run_sync(tee.drain)
+            finally:
+                tg.cancel_scope.cancel()
+        return buffered
 
     def _send_options(self, *, force: bool) -> SendOptions:
         local: LocalSendOptions | None = None
