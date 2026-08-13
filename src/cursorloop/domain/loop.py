@@ -125,7 +125,7 @@ def decide_after_turn(
     now: datetime,
     config: WaitPolicyConfig = DEFAULT_WAIT_POLICY_CONFIG,
     tokens: int = 0,
-    dollars: float | None = 0.0,
+    dollars: float | None = None,
     started_at: datetime | None = None,
 ) -> tuple[RunState, Decision]:
     """Called once a real turn has completed. A capacity rejection always outranks a
@@ -145,7 +145,11 @@ def decide_after_turn(
     # limit is never "done".
     if not isinstance(capacity, Available):
         return _enter_waiting(
-            RunState(phase=state.phase, ledger=new_ledger), capacity, now=now, config=config
+            RunState(phase=state.phase, ledger=new_ledger),
+            capacity,
+            now=now,
+            config=config,
+            started_at=started_at,
         )
 
     if isinstance(verdict, Done):
@@ -176,6 +180,7 @@ def decide_after_probe(
     *,
     now: datetime,
     config: WaitPolicyConfig = DEFAULT_WAIT_POLICY_CONFIG,
+    started_at: datetime | None = None,
 ) -> tuple[RunState, Decision]:
     """Called once a throwaway probe turn has completed while waiting."""
     if isinstance(capacity, AuthenticationFailed):
@@ -183,8 +188,15 @@ def decide_after_probe(
             success=False, reason="authentication failed"
         )
     if isinstance(capacity, Available):
-        return RunState(phase=Phase.RUNNING, ledger=state.ledger), SendTurn()
-    return _enter_waiting(state, capacity, now=now, config=config, is_reprobe=True)
+        running = RunState(phase=Phase.RUNNING, ledger=state.ledger)
+        if _budget_exhausted(state.ledger, now=now, started_at=started_at):
+            return _fail(running, "budget exhausted"), Finish(
+                success=False, reason="budget exhausted"
+            )
+        return running, SendTurn()
+    return _enter_waiting(
+        state, capacity, now=now, config=config, is_reprobe=True, started_at=started_at
+    )
 
 
 def _budget_exhausted(ledger: BudgetLedger, *, now: datetime, started_at: datetime | None) -> bool:
@@ -202,6 +214,7 @@ def _enter_waiting(
     now: datetime,
     config: WaitPolicyConfig = DEFAULT_WAIT_POLICY_CONFIG,
     is_reprobe: bool = False,
+    started_at: datetime | None = None,
 ) -> tuple[RunState, Decision]:
     # Precondition, not a security gate: every caller (decide_preflight,
     # decide_after_turn, decide_after_probe) only reaches _enter_waiting after
@@ -210,6 +223,9 @@ def _enter_waiting(
     assert isinstance(capacity, (WindowExhausted, CreditsExhausted))  # nosec B101
     started = state.started_waiting_at if is_reprobe and state.started_waiting_at else now
     probe_count = state.probe_count + 1 if is_reprobe else 0
+
+    if _budget_exhausted(state.ledger, now=now, started_at=started_at):
+        return _fail(state, "budget exhausted"), Finish(success=False, reason="budget exhausted")
 
     if wait_exceeded(started_waiting_at=started, now=now, config=config):
         failed = RunState(

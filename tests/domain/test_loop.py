@@ -194,6 +194,51 @@ def test_wall_clock_under_cap_does_not_stop_a_continue() -> None:
     assert isinstance(decision, SendTurn)
 
 
+def test_omitted_dollars_is_unknown_cost_not_billed_zero() -> None:
+    """spend_turn treats None as unknown (cost_pending); 0.0 is billed zero.
+    Defaulting dollars to 0.0 reintroduces the settling-None-as-$0 footgun."""
+    state, _ = decide_after_turn(start(LEDGER), capacity=Available(), verdict=Continue(), now=NOW)
+    assert state.ledger.cost_pending is True
+    assert state.ledger.dollars_spent == 0.0
+
+
+def test_wall_clock_exhaustion_stops_probe_resume() -> None:
+    ledger = BudgetLedger(budget=Budget(max_wall_clock=timedelta(hours=1)))
+    waiting, _ = decide_after_turn(
+        start(ledger), capacity=CreditsExhausted(), verdict=Continue(), now=NOW
+    )
+    state, decision = decide_after_probe(
+        waiting, Available(), now=NOW + timedelta(hours=2), started_at=NOW
+    )
+    assert state.phase is Phase.FAILED
+    assert decision == Finish(success=False, reason="budget exhausted")
+
+
+def test_wall_clock_exhaustion_stops_waiting_instead_of_rescheduling() -> None:
+    ledger = BudgetLedger(budget=Budget(max_wall_clock=timedelta(hours=1)))
+    waiting, _ = decide_after_turn(
+        start(ledger), capacity=CreditsExhausted(), verdict=Continue(), now=NOW
+    )
+    state, decision = decide_after_probe(
+        waiting, CreditsExhausted(), now=NOW + timedelta(hours=2), started_at=NOW
+    )
+    assert state.phase is Phase.FAILED
+    assert decision == Finish(success=False, reason="budget exhausted")
+
+
+def test_wall_clock_exhaustion_stops_entering_wait() -> None:
+    ledger = BudgetLedger(budget=Budget(max_wall_clock=timedelta(hours=1)))
+    state, decision = decide_after_turn(
+        start(ledger),
+        capacity=CreditsExhausted(),
+        verdict=Continue(),
+        now=NOW + timedelta(hours=2),
+        started_at=NOW,
+    )
+    assert state.phase is Phase.FAILED
+    assert decision == Finish(success=False, reason="budget exhausted")
+
+
 def test_after_probe_still_exhausted_reschedules_from_fresh_state() -> None:
     state, decision = decide_after_probe(start(LEDGER), CreditsExhausted(), now=NOW)
     assert state.phase is Phase.WAITING
