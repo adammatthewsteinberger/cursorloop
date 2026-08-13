@@ -211,13 +211,19 @@ class AutonomousRunner:
         )
         force = False
         transient = 0
+        busy = 0
         while True:
             outcome = await self._gateway.send_turn(prompt, force=force)
             force = False
             classified = classify(outcome.signals, now=self._clock.now())
             if isinstance(classified, Busy):
                 await self._gateway.cancel_active_run()
+                terminal = self._retry_or_give_up(busy, reason="agent busy")
+                if isinstance(terminal, Finish):
+                    return state, terminal
+                busy = terminal
                 force = True
+                await self._sleep_backoff(busy)
                 continue
             if isinstance(classified, TransientFault):
                 terminal = self._transient_or_retry(classified, transient)

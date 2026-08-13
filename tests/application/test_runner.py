@@ -397,3 +397,20 @@ def test_busy_probe_script_terminates_without_hanging() -> None:
     assert probe.calls == 4  # initial + 3 retries
     assert sleeper.real_sleep_calls == 0
     assert sleeper.wait_log
+
+
+def test_busy_send_script_terminates_without_hanging() -> None:
+    """A stuck AgentBusyError on send must cancel, force-retry with backoff, then cap."""
+    clock = fakes.FakeClock()
+    sleeper = fakes.FakeSleeper(clock)
+    gateway = fakes.FakeAgentGateway([fakes.busy_turn()] * 20)
+    runner = fakes.build_runner(
+        gateway=gateway, clock=clock, sleeper=sleeper, max_transient_retries=3
+    )
+    result = anyio.run(runner.run, "do the work")
+    assert result.success is False
+    assert gateway.send_calls == 4  # initial + 3 retries
+    assert gateway.cancel_calls == 4
+    assert gateway.force_flags == [False, True, True, True]
+    assert sleeper.real_sleep_calls == 0
+    assert sleeper.wait_log
