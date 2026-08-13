@@ -8,8 +8,35 @@ from datetime import UTC, datetime
 from typing import Any
 
 from cursorloop.application.dto import TurnOutcome
+from cursorloop.application.ports import (
+    AgentGateway,
+    AuditLog,
+    CapacityProbe,
+    Clock,
+    HookManager,
+    Logger,
+    Notifier,
+    ProgressReporter,
+    RunControl,
+    RunStateStore,
+    Sleeper,
+)
+from cursorloop.application.runner import AutonomousRunner, RunnerContext
+from cursorloop.domain.budget import Budget
+from cursorloop.domain.capacity import (
+    AuthenticationFailed,
+    Available,
+    CapacityState,
+    CreditsExhausted,
+    WindowExhausted,
+)
 from cursorloop.domain.classify import TurnSignals
+from cursorloop.domain.completion import StructuredVerdict
+from cursorloop.domain.control import ControlCommand
+from cursorloop.domain.faults import Busy, ConfigFault, Fault, TransientFault
 from cursorloop.domain.model_profile import ModelProfile
+from cursorloop.domain.plan import WorkPlan
+from cursorloop.domain.waiting import DEFAULT_PROGRESS_WAIT_CONFIG, DEFAULT_WAIT_POLICY_CONFIG
 
 _DEFAULT_START = datetime(2026, 8, 13, 12, 0, tzinfo=UTC)
 
@@ -190,3 +217,185 @@ class FakeUsageReader:
 
     async def billed_cost_usd(self) -> float | None:
         return self._billed_cost_usd
+
+
+class FakeProgressReporter:
+    def __init__(self) -> None:
+        self.turns: list[int] = []
+        self.waits: list[tuple[str, datetime]] = []
+        self.finishes: list[tuple[bool, str]] = []
+
+    def turn_sent(self, *, attempt: int) -> None:
+        self.turns.append(attempt)
+
+    def waiting(self, *, reason: str, until: datetime) -> None:
+        self.waits.append((reason, until))
+
+    def finished(self, *, success: bool, reason: str) -> None:
+        self.finishes.append((success, reason))
+
+
+class FakeLogger:
+    def __init__(self) -> None:
+        self.events: list[tuple[str, str, dict[str, Any]]] = []
+
+    def bind(self, **kwargs: Any) -> FakeLogger:
+        del kwargs
+        return self
+
+    def debug(self, event: str, **kwargs: Any) -> None:
+        self.events.append(("debug", event, kwargs))
+
+    def info(self, event: str, **kwargs: Any) -> None:
+        self.events.append(("info", event, kwargs))
+
+    def warning(self, event: str, **kwargs: Any) -> None:
+        self.events.append(("warning", event, kwargs))
+
+    def error(self, event: str, **kwargs: Any) -> None:
+        self.events.append(("error", event, kwargs))
+
+
+class FakeRunControl:
+    def __init__(self, script: list[list[ControlCommand]] | None = None) -> None:
+        self._script = list(script or [])
+        self.polls = 0
+
+    def poll(self) -> list[ControlCommand]:
+        self.polls += 1
+        if self._script:
+            return self._script.pop(0)
+        return []
+
+
+def signals_for(capacity_or_fault: CapacityState | Fault) -> TurnSignals:
+    """TurnSignals that ``classify()`` maps to the given ADT."""
+    if isinstance(capacity_or_fault, CreditsExhausted):
+        return TurnSignals(http_status=402)
+    if isinstance(capacity_or_fault, Available):
+        return TurnSignals(run_status="finished")
+    if isinstance(capacity_or_fault, WindowExhausted):
+        retry_after = None if capacity_or_fault.resets_at is None else "60"
+        return TurnSignals(
+            error_type="RateLimitError",
+            is_retryable=True,
+            retry_after=retry_after,
+            http_status=429,
+        )
+    if isinstance(capacity_or_fault, AuthenticationFailed):
+        return TurnSignals(
+            error_type="AuthenticationError",
+            error_message=capacity_or_fault.detail,
+            http_status=401,
+        )
+    if isinstance(capacity_or_fault, Busy):
+        return TurnSignals(error_type="AgentBusyError")
+    if isinstance(capacity_or_fault, TransientFault):
+        return TurnSignals(error_type="NetworkError", is_retryable=True)
+    if isinstance(capacity_or_fault, ConfigFault):
+        return TurnSignals(error_type="ConfigurationError", error_message=capacity_or_fault.detail)
+    raise TypeError(f"unsupported capacity/fault: {type(capacity_or_fault)!r}")
+
+
+def turn(
+    *,
+    capacity: CapacityState | Fault | None = None,
+    done: bool = False,
+    summary: str = "",
+    remaining_work: tuple[str, ...] = (),
+    blocked_on: str | None = None,
+    output_text: str = "",
+    tokens: int = 0,
+    cost_usd: float | None = None,
+) -> TurnOutcome:
+    """Scripted TurnOutcome whose signals/verdict match the requested ADT."""
+    signals = signals_for(capacity) if capacity is not None else signals_for(Available())
+    verdict: StructuredVerdict | None = None
+    if done:
+        verdict = StructuredVerdict(complete=True, summary=summary, remaining_work=remaining_work)
+        if not output_text:
+            output_text = summary
+    elif blocked_on is not None:
+        verdict = StructuredVerdict(complete=False, blocked_on=blocked_on, summary=summary)
+        if not output_text:
+            output_text = blocked_on
+    elif remaining_work:
+        verdict = StructuredVerdict(complete=False, remaining_work=remaining_work, summary=summary)
+    pending = cost_usd is None
+    return TurnOutcome(
+        signals=signals,
+        verdict=verdict,
+        output_text=output_text,
+        tokens=tokens,
+        cost_usd=cost_usd,
+        cost_pending=pending,
+    )
+
+
+def busy_turn() -> TurnOutcome:
+    return turn(capacity=Busy(agent_id="", active_run_id=None))
+
+
+def transient_turn() -> TurnOutcome:
+    return turn(capacity=TransientFault(kind="network", attempt_hint=1))
+
+
+def blocked_turn(reason: str) -> TurnOutcome:
+    return turn(blocked_on=reason)
+
+
+def config_fault_turn(detail: str = "unknown model") -> TurnOutcome:
+    return turn(capacity=ConfigFault(detail=detail))
+
+
+def _available_script(n: int = 32) -> list[TurnSignals]:
+    return [signals_for(Available())] * n
+
+
+def build_runner(
+    *,
+    gateway: AgentGateway | None = None,
+    probe: CapacityProbe | None = None,
+    clock: Clock | None = None,
+    sleeper: Sleeper | None = None,
+    reporter: ProgressReporter | None = None,
+    audit: AuditLog | None = None,
+    notifier: Notifier | None = None,
+    logger: Logger | None = None,
+    hooks: HookManager | None = None,
+    lock: FakeAgentLock | None = None,
+    store: RunStateStore | None = None,
+    control: RunControl | None = None,
+    max_transient_retries: int = 8,
+    run_id: str = "test-run",
+    plan: WorkPlan | None = None,
+    budget: Budget | None = None,
+    continue_prompt: str = "Continue exactly where you left off.",
+) -> AutonomousRunner:
+    """Wire an AutonomousRunner with fakes for every port it needs."""
+    clock = clock if clock is not None else FakeClock()
+    sleeper = sleeper if sleeper is not None else FakeSleeper(clock)  # type: ignore[arg-type]
+    ctx = RunnerContext(
+        gateway=gateway
+        if gateway is not None
+        else FakeAgentGateway([turn(done=True, summary="finished")]),
+        probe=probe if probe is not None else FakeCapacityProbe(_available_script()),
+        clock=clock,
+        sleeper=sleeper,
+        reporter=reporter if reporter is not None else FakeProgressReporter(),
+        audit=audit if audit is not None else FakeAuditLog(),
+        notifier=notifier if notifier is not None else FakeNotifier(),
+        logger=logger if logger is not None else FakeLogger(),
+        hooks=hooks if hooks is not None else FakeHookManager(),
+        lock=lock if lock is not None else FakeAgentLock(),
+        store=store if store is not None else FakeRunStateStore(),
+        control=control if control is not None else FakeRunControl(),
+        budget=budget if budget is not None else Budget(),
+        wait_policy=DEFAULT_WAIT_POLICY_CONFIG,
+        progress_wait=DEFAULT_PROGRESS_WAIT_CONFIG,
+        max_transient_retries=max_transient_retries,
+        run_id=run_id,
+        plan=plan,
+        continue_prompt=continue_prompt,
+    )
+    return AutonomousRunner(ctx)

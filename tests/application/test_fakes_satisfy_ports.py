@@ -7,8 +7,15 @@ import pytest
 
 from cursorloop.application import ports
 from cursorloop.application.dto import ProbeResult, RunResult, TurnOutcome
-from cursorloop.domain.classify import TurnSignals
+from cursorloop.domain.capacity import (
+    AuthenticationFailed,
+    Available,
+    CreditsExhausted,
+    WindowExhausted,
+)
+from cursorloop.domain.classify import TurnSignals, classify
 from cursorloop.domain.completion import StructuredVerdict
+from cursorloop.domain.faults import Busy, ConfigFault, TransientFault
 from cursorloop.domain.model_profile import SHIPPED_PRESETS
 from tests.application import fakes
 
@@ -26,6 +33,9 @@ def test_every_fake_structurally_satisfies_its_protocol() -> None:
     assert isinstance(fakes.FakeRunStateStore(), ports.RunStateStore)
     assert isinstance(fakes.FakeAgentLock(), ports.AgentLock)
     assert isinstance(fakes.FakeUsageReader(), ports.UsageReader)
+    assert isinstance(fakes.FakeProgressReporter(), ports.ProgressReporter)
+    assert isinstance(fakes.FakeLogger(), ports.Logger)
+    assert isinstance(fakes.FakeRunControl(), ports.RunControl)
 
 
 def test_fake_sleeper_advances_the_fake_clock_without_real_sleeping() -> None:
@@ -150,6 +160,36 @@ def test_fake_agent_lock_is_exclusive_per_agent() -> None:
     assert lock.acquire("agent-2") is True
     lock.release("agent-1")
     assert lock.acquire("agent-1") is True
+
+
+def test_signals_for_maps_capacity_and_faults_to_classify_inputs() -> None:
+    now = datetime(2026, 8, 13, 12, 0, tzinfo=UTC)
+    assert isinstance(classify(fakes.signals_for(CreditsExhausted()), now=now), CreditsExhausted)
+    assert isinstance(classify(fakes.signals_for(Available()), now=now), Available)
+    assert isinstance(
+        classify(fakes.signals_for(Busy(agent_id="", active_run_id=None)), now=now), Busy
+    )
+    assert isinstance(
+        classify(fakes.signals_for(TransientFault(kind="network", attempt_hint=1)), now=now),
+        TransientFault,
+    )
+    assert isinstance(classify(fakes.signals_for(ConfigFault(detail="nope")), now=now), ConfigFault)
+    assert isinstance(
+        classify(fakes.signals_for(AuthenticationFailed("bad key")), now=now),
+        AuthenticationFailed,
+    )
+    window = classify(
+        fakes.signals_for(WindowExhausted("rate_limit", None)),
+        now=now,
+    )
+    assert isinstance(window, WindowExhausted)
+    scheduled = classify(
+        fakes.signals_for(WindowExhausted("rate_limit", now)),
+        now=now,
+    )
+    assert isinstance(scheduled, WindowExhausted)
+    with pytest.raises(TypeError, match="unsupported"):
+        fakes.signals_for(object())  # type: ignore[arg-type]
 
 
 async def test_fake_usage_reader_returns_none_when_cost_is_unknown() -> None:
