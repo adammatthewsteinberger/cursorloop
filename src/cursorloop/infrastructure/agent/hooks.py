@@ -176,13 +176,15 @@ class ManagedHooks:
         )
 
     def _snapshot_original(self) -> tuple[bool, bytes]:
-        """Keep an existing backup when restore state is absent.
+        """Keep an existing backup only when restore state is absent.
 
         A crash after mutating hooks.json can leave the merged file as the only
         on-disk copy of the workspace hooks. Overwriting ``hooks.json.original``
-        in that window would discard the user's real original.
+        in that window would discard the user's real original. After a
+        successful restore the backup is unlinked, so the next install
+        snapshots live ``.cursor/hooks.json``.
         """
-        if self._backup_path.exists():
+        if self._backup_path.exists() and not self.is_installed():
             original = self._backup_path.read_bytes()
             return original != b"", original
         existed = self._hooks_file.exists()
@@ -258,6 +260,8 @@ class ManagedHooks:
             self._atomic_write(self._state_path, _encode(state))
         elif self._state_path.exists():
             self._state_path.unlink()
+        if self._backup_path.exists():
+            self._backup_path.unlink()
 
     def _atomic_write(self, path: Path, data: bytes) -> None:
         path.parent.mkdir(parents=True, exist_ok=True)

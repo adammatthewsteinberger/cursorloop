@@ -241,6 +241,41 @@ def test_install_does_not_snapshot_merged_hooks_as_original_when_state_is_missin
     assert hooks_file.read_text() == original
 
 
+def test_between_run_user_hook_edits_are_appended_not_replaced(tmp_path: Path) -> None:
+    """A successful restore must drop the original backup so the next install
+    snapshots live hooks.json. Reusing a leftover backup would overwrite
+    between-run user edits."""
+    hooks_file = tmp_path / ".cursor" / "hooks.json"
+    hooks_file.parent.mkdir(parents=True)
+    hooks_file.write_text(
+        json.dumps({"version": 1, "hooks": {"afterFileEdit": [{"command": "./fmt.sh"}]}})
+    )
+    state_dir = tmp_path / ".cursorloop"
+    manager = ManagedHooks(workspace=tmp_path, state_dir=state_dir)
+    manager.install()
+    assert manager.restore() is True
+    assert not (state_dir / "hooks.json.original").exists()
+
+    hooks_file.write_text(
+        json.dumps(
+            {
+                "version": 1,
+                "hooks": {
+                    "afterFileEdit": [
+                        {"command": "./fmt.sh"},
+                        {"command": "./mine.sh"},
+                    ]
+                },
+            }
+        )
+    )
+
+    manager.install()
+    merged = json.loads(hooks_file.read_text())
+    assert {"command": "./fmt.sh"} in merged["hooks"]["afterFileEdit"]
+    assert {"command": "./mine.sh"} in merged["hooks"]["afterFileEdit"]
+
+
 def test_diff_describes_the_fragment_that_would_be_appended(tmp_path: Path) -> None:
     hooks_file = tmp_path / ".cursor" / "hooks.json"
     hooks_file.parent.mkdir(parents=True)
