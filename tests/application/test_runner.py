@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
 
 import anyio
 import pytest
 
+from cursorloop.application import runner as runner_mod
 from cursorloop.application.usecases.run_plan import run_from_plan_file
 from cursorloop.domain.autonomy import autonomy_preamble
 from cursorloop.domain.budget import Budget
@@ -222,6 +224,29 @@ def test_hooks_and_lock_are_released_when_the_gateway_raises() -> None:
     assert gateway.closed is True
 
 
+class _RaisingStore:
+    def save(self, run_id: str, state: dict[str, Any]) -> None:
+        del run_id, state
+        raise RuntimeError("disk full")
+
+    def load(self, run_id: str) -> dict[str, Any] | None:
+        del run_id
+        return None
+
+
+def test_hooks_and_lock_are_released_when_persist_raises() -> None:
+    """A failed store.save must not leave the lock held or hooks installed."""
+    hooks = fakes.FakeHookManager()
+    lock = fakes.FakeAgentLock()
+    gateway = fakes.FakeAgentGateway([fakes.turn(done=True, summary="finished")])
+    runner = fakes.build_runner(gateway=gateway, hooks=hooks, lock=lock, store=_RaisingStore())
+    with pytest.raises(RuntimeError, match="disk full"):
+        anyio.run(runner.run, "do the work")
+    assert hooks.installed_then_restored is True
+    assert lock.held == set()
+    assert gateway.closed is True
+
+
 def test_lock_held_fails_without_sending() -> None:
     lock = fakes.FakeAgentLock()
     lock.acquire("fake-agent")
@@ -334,3 +359,41 @@ def test_preflight_transient_gives_up_at_the_cap() -> None:
     assert result.success is False
     assert probe.calls == 1
     assert gateway.send_calls == 0
+
+
+def test_transient_backoff_applies_bounded_jitter(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Retries must jitter the exponential delay, not sleep a deterministic 1+2+4."""
+    monkeypatch.setattr(runner_mod.random, "uniform", lambda _a, _b: 0.5)
+    clock = fakes.FakeClock()
+    sleeper = fakes.FakeSleeper(clock)
+    started = clock.now()
+    gateway = fakes.FakeAgentGateway([fakes.transient_turn()] * 10)
+    runner = fakes.build_runner(
+        gateway=gateway, clock=clock, sleeper=sleeper, max_transient_retries=3
+    )
+    result = anyio.run(runner.run, "do the work")
+    assert result.success is False
+    elapsed = (clock.now() - started).total_seconds()
+    # base delays 1+2+4 plus 0.5s jitter each = 8.5; without jitter this is 7.0
+    assert elapsed == pytest.approx(8.5)
+    assert sleeper.real_sleep_calls == 0
+
+
+def test_busy_probe_script_terminates_without_hanging() -> None:
+    """A stuck AgentBusyError on the probe path must cap and back off, not busy-loop."""
+    clock = fakes.FakeClock()
+    sleeper = fakes.FakeSleeper(clock)
+    probe = fakes.FakeCapacityProbe([fakes.signals_for(Busy(agent_id="", active_run_id=None))] * 20)
+    gateway = fakes.FakeAgentGateway([])
+    runner = fakes.build_runner(
+        gateway=gateway,
+        probe=probe,
+        clock=clock,
+        sleeper=sleeper,
+        max_transient_retries=3,
+    )
+    result = anyio.run(runner.run, "do the work")
+    assert result.success is False
+    assert probe.calls == 4  # initial + 3 retries
+    assert sleeper.real_sleep_calls == 0
+    assert sleeper.wait_log

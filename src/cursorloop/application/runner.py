@@ -8,6 +8,7 @@ decided was needed.
 from __future__ import annotations
 
 import contextlib
+import random
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import assert_never
@@ -62,6 +63,8 @@ from cursorloop.domain.waiting import (
 
 _SLEEP_CHUNK = timedelta(seconds=5)
 _CONTINUE_PROMPT = "Continue exactly where you left off."
+_BACKOFF_CEILING_SECONDS = 8.0
+_JITTER_SECONDS = 1.0
 
 
 @dataclass
@@ -132,8 +135,8 @@ class AutonomousRunner:
         self._started_at = self._clock.now()
         self._first_turn = True
         self._log.info("run.started", prompt_len=len(initial_prompt))
-        self._hooks.install()
         try:
+            self._hooks.install()
             if not self._lock.acquire(agent_id):
                 result = self._finish(state, Finish(success=False, reason="lock held"), agent_id)
                 return result
@@ -183,7 +186,8 @@ class AutonomousRunner:
             self._log.error("run.exception", error=type(exc).__name__, detail=str(exc)[:500])
             raise
         finally:
-            self._persist(state)
+            with contextlib.suppress(Exception):
+                self._persist(state)
             if acquired:
                 self._lock.release(agent_id)
             self._hooks.restore()
@@ -303,14 +307,22 @@ class AutonomousRunner:
 
     async def _until_capacity(self) -> CapacityState | Finish:
         transient = 0
+        busy = 0
         while True:
             outcome = await self._probe.probe()
             classified = classify(outcome.signals, now=self._clock.now())
             if isinstance(classified, Busy):
                 await self._gateway.cancel_active_run()
+                terminal = self._retry_or_give_up(busy, reason="agent busy")
+                if isinstance(terminal, Finish):
+                    return terminal
+                busy = terminal
+                await self._sleep_backoff(busy)
                 continue
             if isinstance(classified, TransientFault):
-                terminal = self._transient_or_retry(classified, transient)
+                terminal = self._retry_or_give_up(
+                    transient, reason=f"transient fault: {classified.kind}"
+                )
                 if isinstance(terminal, Finish):
                     return terminal
                 transient = terminal
@@ -321,14 +333,18 @@ class AutonomousRunner:
             self._last_capacity = classified
             return classified
 
-    def _transient_or_retry(self, fault: TransientFault, transient: int) -> int | Finish:
-        if transient >= self._max_transient_retries:
-            return Finish(success=False, reason=f"transient fault: {fault.kind}")
-        return transient + 1
+    def _retry_or_give_up(self, attempt: int, *, reason: str) -> int | Finish:
+        if attempt >= self._max_transient_retries:
+            return Finish(success=False, reason=reason)
+        return attempt + 1
 
-    async def _sleep_backoff(self, transient: int) -> None:
-        delay = timedelta(seconds=min(2 ** (transient - 1), 8))
-        await self._sleeper.sleep_until(self._clock.now() + delay)
+    def _transient_or_retry(self, fault: TransientFault, transient: int) -> int | Finish:
+        return self._retry_or_give_up(transient, reason=f"transient fault: {fault.kind}")
+
+    async def _sleep_backoff(self, attempt: int) -> None:
+        base = min(float(2 ** (attempt - 1)), _BACKOFF_CEILING_SECONDS)
+        jitter = random.uniform(0.0, _JITTER_SECONDS)  # noqa: S311  # nosec B311
+        await self._sleeper.sleep_until(self._clock.now() + timedelta(seconds=base + jitter))
 
     def _verdict_for(self, outcome: TurnOutcome) -> CompletionVerdict:
         verdict = evaluate(
