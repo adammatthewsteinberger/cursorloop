@@ -1,6 +1,6 @@
 """Configuration: CLI/env/file/defaults. Only ``CURSORLOOP_*`` and ``CURSOR_API_KEY``.
 
-Never reads ``ANTHROPIC_*``. Config files use stdlib ``tomllib``.
+Vendor-foreign env prefixes are ignored. Config files use stdlib ``tomllib``.
 """
 
 from __future__ import annotations

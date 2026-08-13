@@ -1,0 +1,37 @@
+name: Feature request
+description: Propose a change or enhancement.
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please check `docs/plans/architecture-and-roadmap.md` and open issues first.
+        Changes that violate the non-negotiables in `AGENTS.md` / `CURSOR.md` will be closed.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What gap are you hitting?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How should cursorloop behave instead?
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: non-negotiables
+    attributes:
+      label: Non-negotiables
+      options:
+        - label: This does not require blocking on a human mid-run
+          required: true
+        - label: This does not conflate credits exhaustion with a waitable rate-limit window
+          required: true
+        - label: This does not introduce an Anthropic / foreign-vendor auth dependency
+          required: true
