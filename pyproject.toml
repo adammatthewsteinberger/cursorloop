@@ -135,3 +135,6 @@ name = "Domain imports no third party"
 type = "forbidden"
 source_modules = ["cursorloop.domain"]
 forbidden_modules = ["cursor_sdk", "typer", "structlog", "httpx", "anyio", "textual"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/cursorloop/infrastructure/api/cloud-agents-openapi.yaml" = "cursorloop/infrastructure/api/cloud-agents-openapi.yaml"

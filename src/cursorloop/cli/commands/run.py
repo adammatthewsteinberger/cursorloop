@@ -46,13 +46,14 @@ def run(
     log_level: str = typer.Option("INFO", "--log-level"),
 ) -> None:
     """Seed a Cursor Agent from PLAN and run autonomously to completion."""
-    del turn_timeout, stall_timeout  # wired when watchdog config is plumbed
     _run(
         plan=plan,
         cwd_dir=cwd_dir,
         max_turns=max_turns,
         max_dollars=max_dollars,
         max_wait=max_wait,
+        turn_timeout=turn_timeout,
+        stall_timeout=stall_timeout,
         managed_hooks=managed_hooks,
         model=model,
         log_level=log_level,
@@ -67,6 +68,8 @@ async def _run(
     max_turns: int | None,
     max_dollars: float | None,
     max_wait: float | None,
+    turn_timeout: float | None,
+    stall_timeout: float | None,
     managed_hooks: bool,
     model: str | None,
     log_level: str,
@@ -77,6 +80,8 @@ async def _run(
         "max_turns": max_turns,
         "max_dollars": max_dollars,
         "max_wait_seconds": max_wait,
+        "turn_timeout_seconds": turn_timeout,
+        "stall_timeout_seconds": stall_timeout,
         "model": model,
         "log_level": log_level,
         "managed_hooks": managed_hooks,

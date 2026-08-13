@@ -32,11 +32,13 @@ def _auth_failure_script(tmp_path: Path) -> Path:
     return script
 
 
-def test_run_help_documents_the_never_block_flags() -> None:
-    result = runner.invoke(app, ["run", "--help"])
+def test_run_help_documents_the_never_block_flags(monkeypatch) -> None:
+    # CI runners default to a narrow COLUMNS; Rich truncates option lists.
+    monkeypatch.setenv("COLUMNS", "200")
+    result = runner.invoke(app, ["run", "--help"], env={"COLUMNS": "200"})
     assert result.exit_code == 0
     for flag in ("--turn-timeout", "--stall-timeout", "--max-wait", "--managed-hooks"):
-        assert flag in result.stdout
+        assert flag in result.stdout, result.stdout
 
 
 def test_test_agent_gate_requires_both_env_vars(monkeypatch, tmp_path: Path) -> None:

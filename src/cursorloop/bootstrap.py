@@ -126,8 +126,16 @@ def build_runner(
             launch_bridge=launch_bridge,
         )
         watchdog = TurnWatchdog(
-            turn_timeout=timedelta(minutes=30),
-            stall_timeout=timedelta(minutes=10),
+            turn_timeout=timedelta(
+                seconds=config.turn_timeout_seconds
+                if config.turn_timeout_seconds is not None
+                else 30 * 60
+            ),
+            stall_timeout=timedelta(
+                seconds=config.stall_timeout_seconds
+                if config.stall_timeout_seconds is not None
+                else 10 * 60
+            ),
             clock=clock,
         )
         gateway = CursorAgentGateway(
