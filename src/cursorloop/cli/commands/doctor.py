@@ -5,6 +5,7 @@ from pathlib import Path
 import typer
 
 from cursorloop.application.usecases.doctor import explain_error_payload
+from cursorloop.infrastructure.config import load_config
 from cursorloop.infrastructure.doctor_env import findings_as_json, run_doctor
 
 
@@ -18,6 +19,11 @@ def doctor(
         readable=True,
         help="Classify a captured error payload offline",
     ),
+    model: str | None = typer.Option(None, "--model", help="Model profile or id to validate"),
+    cloud: bool = typer.Option(False, "--cloud", help="Also check cloud-hooks dirty state"),
+    offline: bool = typer.Option(
+        False, "--offline", help="Skip live Cursor.me / models.list checks"
+    ),
 ) -> None:
     """Fail-fast preflight checks before a multi-hour unattended run."""
     if explain_error is not None:
@@ -30,7 +36,14 @@ def doctor(
         raise typer.Exit(code=0)
 
     cwd = cwd_dir.resolve() if cwd_dir is not None else Path.cwd()
-    findings = run_doctor(workspace=cwd)
+    config = load_config()
+    findings = run_doctor(
+        workspace=cwd,
+        api_key=config.api_key,
+        model=model or config.model,
+        cloud=cloud,
+        live=not offline,
+    )
     if as_json:
         typer.echo(findings_as_json(findings), nl=False)
     else:
