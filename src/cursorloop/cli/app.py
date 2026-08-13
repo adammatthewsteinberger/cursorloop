@@ -6,6 +6,18 @@ import typer
 
 from cursorloop import __version__
 from cursorloop.cli.commands.agents import agents, hooks, models, usage, whoami
+from cursorloop.cli.commands.control_cmds import (
+    logs,
+    prompt,
+    reset,
+    runs,
+    savepoints,
+    snapshot,
+    status,
+    stop,
+    unwind,
+    watch,
+)
 from cursorloop.cli.commands.doctor import doctor
 from cursorloop.cli.commands.resume import resume
 from cursorloop.cli.commands.run import run
@@ -23,6 +35,16 @@ app = typer.Typer(
 
 app.command(name="run")(run)
 app.command(name="resume")(resume)
+app.command(name="stop")(stop)
+app.command(name="prompt")(prompt)
+app.command(name="status")(status)
+app.command(name="logs")(logs)
+app.command(name="watch")(watch)
+app.command(name="runs")(runs)
+app.command(name="savepoints")(savepoints)
+app.command(name="unwind")(unwind)
+app.command(name="snapshot")(snapshot)
+app.command(name="reset")(reset)
 app.command(name="agents")(agents)
 app.command(name="models")(models)
 app.command(name="usage")(usage)
