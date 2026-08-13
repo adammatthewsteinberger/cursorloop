@@ -72,6 +72,13 @@ docs = [
 [project.scripts]
 cursorloop = "cursorloop.cli.app:main"
 
+[project.urls]
+Homepage = "https://github.com/adammatthewsteinberger/cursorloop"
+Repository = "https://github.com/adammatthewsteinberger/cursorloop"
+Issues = "https://github.com/adammatthewsteinberger/cursorloop/issues"
+Changelog = "https://github.com/adammatthewsteinberger/cursorloop/blob/main/CHANGELOG.md"
+Documentation = "https://adammatthewsteinberger.github.io/cursorloop/"
+
 [tool.hatch.build.targets.wheel]
 packages = ["src/cursorloop"]
 
