@@ -6,6 +6,7 @@ import typer
 
 from cursorloop import __version__
 from cursorloop.cli.commands.agents import agents, hooks, models, usage, whoami
+from cursorloop.cli.commands.cloud import cloud_app
 from cursorloop.cli.commands.control_cmds import (
     logs,
     prompt,
@@ -51,6 +52,7 @@ app.command(name="usage")(usage)
 app.command(name="whoami")(whoami)
 app.command(name="hooks")(hooks)
 app.command(name="doctor")(doctor)
+app.add_typer(cloud_app, name="cloud")
 
 
 def main() -> int:
