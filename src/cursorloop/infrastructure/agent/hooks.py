@@ -103,14 +103,8 @@ class ManagedHooks:
         self._scripts_dir.mkdir(parents=True, exist_ok=True)
         self._write_scripts()
 
-        existed = self._hooks_file.exists()
-        original = self._hooks_file.read_bytes() if existed else b""
-        self._backup_path.write_bytes(original)
-
+        existed, original = self._snapshot_original()
         merged_bytes = _encode(self._merge(original))
-        self._hooks_file.parent.mkdir(parents=True, exist_ok=True)
-        self._atomic_write(self._hooks_file, merged_bytes)
-
         self._update_state(
             {
                 "hooks_original_sha256": _sha256(original),
@@ -119,6 +113,8 @@ class ManagedHooks:
                 "hooks_existed": existed,
             }
         )
+        self._hooks_file.parent.mkdir(parents=True, exist_ok=True)
+        self._atomic_write(self._hooks_file, merged_bytes)
 
     def restore(self) -> bool:
         state = self._read_state()
@@ -126,7 +122,12 @@ class ManagedHooks:
         if not isinstance(merged_hash, str):
             return False
         current = self._hooks_file.read_bytes() if self._hooks_file.exists() else b""
-        if _sha256(current) != merged_hash:
+        current_hash = _sha256(current)
+        original_hash = state.get("hooks_original_sha256")
+        if isinstance(original_hash, str) and current_hash == original_hash:
+            self._clear_hook_state()
+            return True
+        if current_hash != merged_hash:
             _LOGGER.warning(
                 "leaving %s in place: on-disk SHA-256 no longer matches the "
                 "merged bytes we wrote; a mid-run edit wins",
@@ -173,6 +174,21 @@ class ManagedHooks:
                 tofile="hooks.json (cursorloop managed)",
             )
         )
+
+    def _snapshot_original(self) -> tuple[bool, bytes]:
+        """Keep an existing backup when restore state is absent.
+
+        A crash after mutating hooks.json can leave the merged file as the only
+        on-disk copy of the workspace hooks. Overwriting ``hooks.json.original``
+        in that window would discard the user's real original.
+        """
+        if self._backup_path.exists():
+            original = self._backup_path.read_bytes()
+            return original != b"", original
+        existed = self._hooks_file.exists()
+        original = self._hooks_file.read_bytes() if existed else b""
+        self._backup_path.write_bytes(original)
+        return existed, original
 
     def _write_scripts(self) -> None:
         for event in MANAGED_EVENTS:

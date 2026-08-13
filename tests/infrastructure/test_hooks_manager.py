@@ -4,6 +4,8 @@ import stat
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from cursorloop.domain.autonomy import autonomy_preamble
 from cursorloop.domain.hooks_policy import (
     MANAGED_EVENTS,
@@ -177,6 +179,66 @@ def test_install_updates_existing_state_json_without_dropping_other_keys(
     assert manager.restore() is True
     leftover = json.loads((state_dir / "state.json").read_text())
     assert leftover == {"run_id": "abc"}
+
+
+def test_crash_after_restore_metadata_leaves_original_hooks_recoverable(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """State must land before we mutate the user's hooks.json. A crash in the
+    hooks-file write then still has hashes on disk and the original bytes."""
+    hooks_file = tmp_path / ".cursor" / "hooks.json"
+    hooks_file.parent.mkdir(parents=True)
+    original = json.dumps({"version": 1, "hooks": {"afterFileEdit": [{"command": "./fmt.sh"}]}})
+    hooks_file.write_text(original)
+
+    manager = ManagedHooks(workspace=tmp_path, state_dir=tmp_path / ".cursorloop")
+    real_atomic_write = manager._atomic_write
+
+    def crash_on_hooks_file(path: Path, data: bytes) -> None:
+        if path == manager._hooks_file:
+            raise OSError("simulated crash during hooks.json write")
+        real_atomic_write(path, data)
+
+    monkeypatch.setattr(manager, "_atomic_write", crash_on_hooks_file)
+    with pytest.raises(OSError, match="simulated crash"):
+        manager.install()
+
+    assert hooks_file.read_text() == original
+    state = json.loads((tmp_path / ".cursorloop" / "state.json").read_text())
+    assert len(state["hooks_original_sha256"]) == 64
+    assert len(state["hooks_merged_sha256"]) == 64
+    assert state["hooks_existed"] is True
+
+    recovered = ManagedHooks(workspace=tmp_path, state_dir=tmp_path / ".cursorloop")
+    assert recovered.restore() is True
+    assert hooks_file.read_text() == original
+
+
+def test_install_does_not_snapshot_merged_hooks_as_original_when_state_is_missing(
+    tmp_path: Path,
+) -> None:
+    """A leftover merged hooks.json with no state.json must not become the
+    backup; that would discard the only copy of the user's original."""
+    hooks_file = tmp_path / ".cursor" / "hooks.json"
+    hooks_file.parent.mkdir(parents=True)
+    original = json.dumps({"version": 1, "hooks": {"afterFileEdit": [{"command": "./fmt.sh"}]}})
+    hooks_file.write_text(original)
+
+    state_dir = tmp_path / ".cursorloop"
+    manager = ManagedHooks(workspace=tmp_path, state_dir=state_dir)
+    manager.install()
+    backup = state_dir / "hooks.json.original"
+    original_backup = backup.read_bytes()
+    assert original_backup == original.encode()
+
+    (state_dir / "state.json").unlink()
+    assert "preToolUse" in hooks_file.read_text()
+
+    later = ManagedHooks(workspace=tmp_path, state_dir=state_dir)
+    later.install()
+    assert backup.read_bytes() == original_backup
+    assert later.restore() is True
+    assert hooks_file.read_text() == original
 
 
 def test_diff_describes_the_fragment_that_would_be_appended(tmp_path: Path) -> None:
