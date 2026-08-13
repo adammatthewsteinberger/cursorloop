@@ -1,5 +1,168 @@
-"""Composition root — the only module permitted to know about every layer at
-once. Wires concrete infrastructure adapters into application ports and hands
-the assembled runner to cli/. Nothing outside this file should import both a
-port from application/ and its concrete infrastructure implementation.
+"""Composition root — the only module permitted to know about every layer.
+
+Wires concrete infrastructure adapters into application ports and hands the
+assembled runner to cli/. Nothing outside this file should import both a port
+from application/ and its concrete infrastructure implementation.
 """
+
+from __future__ import annotations
+
+import uuid
+from dataclasses import dataclass
+from datetime import timedelta
+from pathlib import Path
+from typing import Any
+
+from cursorloop.application.ports import AgentCatalog, AgentGateway, CapacityProbe, HookManager
+from cursorloop.application.runner import AutonomousRunner, RunnerContext
+from cursorloop.domain.budget import Budget
+from cursorloop.domain.model_profile import SHIPPED_PRESETS, ModelProfile
+from cursorloop.domain.waiting import DEFAULT_WAIT_POLICY_CONFIG
+from cursorloop.infrastructure.agent.catalog import CursorAgentCatalog
+from cursorloop.infrastructure.agent.gateway import CursorAgentGateway
+from cursorloop.infrastructure.agent.hooks import ManagedHooks
+from cursorloop.infrastructure.agent.probe import CursorCapacityProbe
+from cursorloop.infrastructure.agent.scripted import resolve_test_agent_from_env
+from cursorloop.infrastructure.agent.watchdog import TurnWatchdog
+from cursorloop.infrastructure.audit import JsonlAuditLog
+from cursorloop.infrastructure.clock import AnyioSleeper, SystemClock
+from cursorloop.infrastructure.config import RunnerConfig
+from cursorloop.infrastructure.control import FileRunControl
+from cursorloop.infrastructure.events import JsonlRunEventSink
+from cursorloop.infrastructure.lock import FileAgentLock
+from cursorloop.infrastructure.logging import StructlogAppLogger, configure_logging
+from cursorloop.infrastructure.notify import StderrNotifier
+from cursorloop.infrastructure.progress import ConsoleProgressReporter
+from cursorloop.infrastructure.rundir import RunDirectory, runs_root_for
+from cursorloop.infrastructure.state import FileRunStateStore
+
+
+class _NullHooks:
+    def install(self) -> None:
+        return None
+
+    def restore(self) -> bool:
+        return False
+
+    def is_installed(self) -> bool:
+        return False
+
+
+@dataclass(frozen=True, slots=True)
+class BuiltRunner:
+    runner: AutonomousRunner
+    gateway: AgentGateway
+    run_dir: RunDirectory
+    run_id: str
+    trace_id: str
+
+
+def resolve_profile(config: RunnerConfig) -> ModelProfile:
+    if config.model and config.model in SHIPPED_PRESETS:
+        return SHIPPED_PRESETS[config.model]
+    if config.model:
+        return ModelProfile(model_id=config.model)
+    return SHIPPED_PRESETS["composer"]
+
+
+def build_runner(
+    *,
+    cwd: Path,
+    config: RunnerConfig,
+    plan_path: Path | None = None,
+    resume_agent_id: str | None = None,
+    client: Any | None = None,
+) -> BuiltRunner:
+    """Assemble an AutonomousRunner for a fresh or resumed run."""
+    run_dir = RunDirectory.create(runs_root_for(cwd), cwd=cwd, plan_path=plan_path)
+    run_id = run_dir.read_meta().run_id
+    trace_id = str(uuid.uuid4())
+    state_root = cwd / ".cursorloop"
+    state_root.mkdir(parents=True, exist_ok=True)
+
+    configure_logging(
+        log_file=Path(config.log_file) if config.log_file else None,
+        level=config.log_level,
+    )
+
+    clock = SystemClock()
+    sleeper = AnyioSleeper(clock)
+    event_sink = JsonlRunEventSink(run_dir.events_path, run_id=run_id, trace_id=trace_id)
+    audit = JsonlAuditLog(run_dir.audit_path, run_id=run_id)
+    profile = resolve_profile(config)
+
+    scripted = resolve_test_agent_from_env()
+    gateway: AgentGateway
+    probe: CapacityProbe
+    if scripted is not None:
+        gateway, probe = scripted
+    else:
+        if client is None:
+            raise RuntimeError(
+                "No Cursor client available. Set CURSOR_API_KEY and use the "
+                "SDK bridge, or enable the test-agent gate "
+                "(CURSORLOOP_ALLOW_TEST_AGENT=1 and CURSORLOOP_TEST_AGENT_SCRIPT)."
+            )
+        watchdog = TurnWatchdog(
+            turn_timeout=timedelta(minutes=30),
+            stall_timeout=timedelta(minutes=10),
+            clock=clock,
+        )
+        if resume_agent_id:
+            agent = client.agents.get(agent_id=resume_agent_id, cwd=str(cwd))
+            # Resume path is SDK-specific; keep opaque for bootstrap.
+            live_agent = getattr(agent, "resume", lambda: agent)()
+        else:
+            live_agent = client.agents.create(cwd=str(cwd), model=profile.model_id)
+        gateway = CursorAgentGateway(
+            client=client,
+            agent=live_agent,
+            profile=profile,
+            watchdog=watchdog,
+            event_sink=event_sink,
+        )
+        probe = CursorCapacityProbe(str(cwd), profile)
+
+    hooks: HookManager
+    if config.managed_hooks:
+        hooks = ManagedHooks(workspace=cwd, state_dir=state_root)
+    else:
+        hooks = _NullHooks()
+
+    wait_policy = DEFAULT_WAIT_POLICY_CONFIG
+    if config.max_wait_seconds is not None:
+        wait_policy = wait_policy.with_max_wait(timedelta(seconds=config.max_wait_seconds))
+
+    budget = Budget(
+        max_turns=config.max_turns,
+        max_cost_usd=config.max_dollars,
+    )
+
+    ctx = RunnerContext(
+        gateway=gateway,
+        probe=probe,
+        clock=clock,
+        sleeper=sleeper,
+        reporter=ConsoleProgressReporter(),
+        audit=audit,
+        notifier=StderrNotifier(),
+        logger=StructlogAppLogger(run_id=run_id, trace_id=trace_id),
+        hooks=hooks,
+        lock=FileAgentLock(state_root / "locks"),
+        store=FileRunStateStore(state_root),
+        control=FileRunControl(run_dir.inbox),
+        budget=budget,
+        wait_policy=wait_policy,
+        run_id=run_id,
+    )
+    return BuiltRunner(
+        runner=AutonomousRunner(ctx),
+        gateway=gateway,
+        run_dir=run_dir,
+        run_id=run_id,
+        trace_id=trace_id,
+    )
+
+
+def build_catalog(*, client: Any) -> AgentCatalog:
+    return CursorAgentCatalog(client)

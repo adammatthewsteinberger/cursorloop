@@ -4,6 +4,8 @@ import subprocess  # nosec B404 - fixed argv, no shell, test-only gate check
 import sys
 from pathlib import Path
 
+import pytest
+
 import cursorloop
 import cursorloop.application
 import cursorloop.cli
@@ -55,5 +57,6 @@ def test_import_linter_contracts_pass() -> None:
     assert result.returncode == 0, result.stdout + result.stderr
 
 
-def test_cli_main_returns_zero() -> None:
+def test_cli_main_returns_zero(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(sys, "argv", ["cursorloop", "--version"])
     assert main() == 0
