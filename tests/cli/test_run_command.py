@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 
 from typer.testing import CliRunner
@@ -8,6 +9,10 @@ from typer.testing import CliRunner
 from cursorloop.cli.app import app
 
 runner = CliRunner()
+
+
+def _strip_ansi(text: str) -> str:
+    return re.sub(r"\x1b\[[0-9;]*m", "", text)
 
 
 def _auth_failure_script(tmp_path: Path) -> Path:
@@ -33,12 +38,22 @@ def _auth_failure_script(tmp_path: Path) -> Path:
 
 
 def test_run_help_documents_the_never_block_flags(monkeypatch) -> None:
-    # CI runners default to a narrow COLUMNS; Rich truncates option lists.
+    # CI runners default to a narrow COLUMNS; Rich also injects ANSI between
+    # dashes (``\x1b…m-\x1b…m-turn-timeout``), which breaks a raw substring
+    # check for ``--turn-timeout``. Force a wide, colorless dump and strip
+    # any residual SGR sequences before asserting.
     monkeypatch.setenv("COLUMNS", "200")
-    result = runner.invoke(app, ["run", "--help"], env={"COLUMNS": "200"})
+    monkeypatch.setenv("NO_COLOR", "1")
+    monkeypatch.setenv("TERM", "dumb")
+    result = runner.invoke(
+        app,
+        ["run", "--help"],
+        env={"COLUMNS": "200", "NO_COLOR": "1", "TERM": "dumb"},
+    )
     assert result.exit_code == 0
+    help_text = _strip_ansi(result.stdout)
     for flag in ("--turn-timeout", "--stall-timeout", "--max-wait", "--managed-hooks"):
-        assert flag in result.stdout, result.stdout
+        assert flag in help_text, help_text
 
 
 def test_test_agent_gate_requires_both_env_vars(monkeypatch, tmp_path: Path) -> None:
