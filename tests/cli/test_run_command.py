@@ -86,3 +86,99 @@ def test_authentication_failure_exits_3(monkeypatch, tmp_path: Path) -> None:
         app, ["run", "--plan", str(plan), "--cwd", str(tmp_path), "--no-managed-hooks"]
     )
     assert result.exit_code == 3
+
+
+def test_run_rejects_invalid_plan(tmp_path: Path) -> None:
+    plan = tmp_path / "empty.md"
+    plan.write_text("   \n")
+    result = runner.invoke(app, ["run", "--plan", str(plan), "--cwd", str(tmp_path)])
+    assert result.exit_code == 1
+    combined = (result.stdout or "") + (result.stderr or "")
+    assert "Invalid plan" in combined or "blank" in combined.lower()
+
+
+def test_run_success_with_scripted_agent(monkeypatch, tmp_path: Path) -> None:
+    plan = tmp_path / "plan.md"
+    plan.write_text("Say hi and finish.\n", encoding="utf-8")
+    script = tmp_path / "done.json"
+    script.write_text(
+        json.dumps(
+            {
+                "probes": [{"signals": {}}],
+                "turns": [
+                    {
+                        "signals": {},
+                        "verdict": {
+                            "complete": True,
+                            "remaining_work": [],
+                            "blocked_on": None,
+                            "summary": "ok",
+                        },
+                        "output_text": "CURSORLOOP_TASK_FULLY_COMPLETE",
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    monkeypatch.setenv("CURSORLOOP_ALLOW_TEST_AGENT", "1")
+    monkeypatch.setenv("CURSORLOOP_TEST_AGENT_SCRIPT", str(script))
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "--plan",
+            str(plan),
+            "--cwd",
+            str(tmp_path),
+            "--no-managed-hooks",
+            "--max-turns",
+            "2",
+            "--model",
+            "composer",
+        ],
+    )
+    assert result.exit_code == 0
+    combined = (result.stdout or "") + (result.stderr or "")
+    assert "Done:" in combined
+
+
+def test_run_build_runner_runtime_error_exits_one(monkeypatch, tmp_path: Path) -> None:
+    plan = tmp_path / "plan.md"
+    plan.write_text("work\n", encoding="utf-8")
+    monkeypatch.delenv("CURSORLOOP_ALLOW_TEST_AGENT", raising=False)
+    monkeypatch.delenv("CURSORLOOP_TEST_AGENT_SCRIPT", raising=False)
+    monkeypatch.delenv("CURSOR_API_KEY", raising=False)
+
+    def boom(**kwargs: object) -> object:
+        del kwargs
+        raise RuntimeError("CURSORLOOP_ALLOW_TEST_AGENT missing")
+
+    from unittest.mock import patch
+
+    with patch("cursorloop.cli.commands.run.bootstrap.build_runner", side_effect=boom):
+        result = runner.invoke(app, ["run", "--plan", str(plan), "--cwd", str(tmp_path)])
+    assert result.exit_code == 1
+
+
+def test_run_failed_turn_prints_reason(monkeypatch, tmp_path: Path) -> None:
+    plan = tmp_path / "plan.md"
+    plan.write_text("work\n", encoding="utf-8")
+    monkeypatch.setenv("CURSORLOOP_ALLOW_TEST_AGENT", "1")
+    monkeypatch.setenv("CURSORLOOP_TEST_AGENT_SCRIPT", str(_auth_failure_script(tmp_path)))
+    result = runner.invoke(
+        app,
+        [
+            "run",
+            "--plan",
+            str(plan),
+            "--cwd",
+            str(tmp_path),
+            "--no-managed-hooks",
+            "--max-turns",
+            "2",
+        ],
+    )
+    assert result.exit_code == 3
+    combined = (result.stdout or "") + (result.stderr or "")
+    assert "Run failed" in combined or "authentication" in combined.lower()

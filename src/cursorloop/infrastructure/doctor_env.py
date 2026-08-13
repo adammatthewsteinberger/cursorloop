@@ -322,8 +322,6 @@ def check_git_repository(workspace: Path) -> Finding:
                 level="pass",
                 detail=f"Git repository found at {parent}",
             )
-        if parent == Path("/"):
-            break
     return Finding(
         name="git-repo",
         level="warn",

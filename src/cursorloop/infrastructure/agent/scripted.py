@@ -137,16 +137,14 @@ def resolve_test_agent_from_env(
     """
     allow = os.environ.get(ALLOW_TEST_AGENT_ENV, "").strip()
     script_path = os.environ.get(TEST_AGENT_SCRIPT_ENV, "").strip()
-    if script_path and allow not in {"1", "true", "TRUE", "yes", "YES"}:
+    if not script_path:
+        return None
+    if allow not in {"1", "true", "TRUE", "yes", "YES"}:
         raise RuntimeError(
             f"{TEST_AGENT_SCRIPT_ENV} is set but {ALLOW_TEST_AGENT_ENV}=1 is "
             "required. The scripted agent is test-only and will not activate "
             "without the allow flag."
         )
-    if not script_path:
-        return None
-    if allow not in {"1", "true", "TRUE", "yes", "YES"}:
-        return None
     script = load_agent_script(script_path)
     gateway = ScriptedAgentGateway(list(script.turns), on_event=on_event)
     probe = ScriptedCapacityProbe(list(script.probes))

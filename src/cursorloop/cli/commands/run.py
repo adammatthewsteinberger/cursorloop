@@ -12,10 +12,6 @@ from cursorloop.application.usecases.run_plan import parse_plan_file, run_from_p
 from cursorloop.cli.asyncio import async_command
 from cursorloop.cli.render import exit_code_for
 from cursorloop.domain.errors import PlanParseError
-from cursorloop.infrastructure.agent.scripted import (
-    ALLOW_TEST_AGENT_ENV,
-    TEST_AGENT_SCRIPT_ENV,
-)
 from cursorloop.infrastructure.config import load_config
 
 
@@ -87,8 +83,7 @@ async def _run(
         "managed_hooks": managed_hooks,
     }
     cleaned = {k: v for k, v in overrides.items() if v is not None}
-    if cleaned:
-        config = replace(config, **cleaned)  # type: ignore[arg-type]
+    config = replace(config, **cleaned)  # type: ignore[arg-type]
 
     try:
         parse_plan_file(plan)
@@ -99,10 +94,7 @@ async def _run(
     try:
         built = bootstrap.build_runner(cwd=cwd, config=config, plan_path=plan)
     except RuntimeError as exc:
-        message = str(exc)
-        typer.echo(message)
-        if ALLOW_TEST_AGENT_ENV in message or TEST_AGENT_SCRIPT_ENV in message:
-            raise typer.Exit(code=1) from exc
+        typer.echo(str(exc))
         raise typer.Exit(code=1) from exc
 
     try:

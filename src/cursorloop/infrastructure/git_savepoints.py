@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess  # nosec B404 — fixed argv git subcommands, never shell=True
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -60,7 +60,7 @@ class GitSavePointStore:
             created_at=datetime.now(UTC).isoformat(),
         )
         with self._index_path.open("a", encoding="utf-8") as fh:
-            fh.write(json.dumps(point.__dict__) + "\n")
+            fh.write(json.dumps(asdict(point)) + "\n")
         return point
 
     def list_points(self, run_id: str) -> list[SavePointRef]:

@@ -153,10 +153,12 @@ class CliFallbackGateway:
     _profile: ModelProfile | None = field(default=None, init=False)
     _cwd: str = field(default="", init=False)
     closed: bool = field(default=False, init=False)
+    _uses_default_runner: bool = field(default=False, init=False)
 
     def __post_init__(self) -> None:
         self._cwd = str(self.workspace)
         if self.runner is None:
+            self._uses_default_runner = True
             self.runner = self._default_runner
 
     def agent_id(self) -> str:
@@ -178,7 +180,7 @@ class CliFallbackGateway:
 
     async def send_turn(self, prompt_text: str, *, force: bool = False) -> TurnOutcome:
         del force
-        if shutil.which(self.agent_binary) is None and self.runner is self._default_runner:
+        if shutil.which(self.agent_binary) is None and self._uses_default_runner:
             raise FileNotFoundError(
                 f"{self.agent_binary!r} not found on PATH; install the Cursor "
                 "agent CLI or use the SDK gateway"
