@@ -42,6 +42,7 @@ dependencies = [
     "anyio>=4.4",
     "httpx>=0.27",
     "textual>=1.0",
+    "pyyaml>=6.0",
 ]
 
 [project.optional-dependencies]
@@ -58,6 +59,8 @@ dev = [
     "build>=1.2",
     "twine>=5.0",
     "pyyaml>=6.0",
+    "types-PyYAML>=6.0",
+    "respx>=0.21",
     "pre-commit>=3.7",
 ]
 docs = [
@@ -68,6 +71,13 @@ docs = [
 
 [project.scripts]
 cursorloop = "cursorloop.cli.app:main"
+
+[project.urls]
+Homepage = "https://github.com/adammatthewsteinberger/cursorloop"
+Repository = "https://github.com/adammatthewsteinberger/cursorloop"
+Issues = "https://github.com/adammatthewsteinberger/cursorloop/issues"
+Changelog = "https://github.com/adammatthewsteinberger/cursorloop/blob/main/CHANGELOG.md"
+Documentation = "https://adammatthewsteinberger.github.io/cursorloop/"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/cursorloop"]
@@ -132,3 +142,6 @@ name = "Domain imports no third party"
 type = "forbidden"
 source_modules = ["cursorloop.domain"]
 forbidden_modules = ["cursor_sdk", "typer", "structlog", "httpx", "anyio", "textual"]
+
+[tool.hatch.build.targets.wheel.force-include]
+"src/cursorloop/infrastructure/api/cloud-agents-openapi.yaml" = "cursorloop/infrastructure/api/cloud-agents-openapi.yaml"

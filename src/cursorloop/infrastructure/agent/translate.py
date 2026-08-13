@@ -31,13 +31,22 @@ def signals_from_exception(exc: BaseException) -> TurnSignals:
     )
 
 
-def signals_from_run(run: object) -> TurnSignals:
-    """Capture classifier inputs from a Run, including non-thrown ``status=error``."""
+def signals_from_run(run: object, *, fallback_text: str = "") -> TurnSignals:
+    """Capture classifier inputs from a Run, including non-thrown ``status=error``.
+
+    Live bridge errors often put the human-readable reason on a stream
+    ``status`` message while leaving ``run.result`` empty. ``fallback_text``
+    carries that status copy (or other tee-captured detail) into the
+    billing/rate-limit lexicons.
+    """
     status = getattr(run, "status", None)
     result = getattr(run, "result", None)
+    result_text = result if isinstance(result, str) else ""
+    if not result_text.strip() and fallback_text.strip():
+        result_text = fallback_text
     return TurnSignals(
         run_status=status if isinstance(status, str) else None,
-        result_text=result if isinstance(result, str) else "",
+        result_text=result_text,
     )
 
 
@@ -46,6 +55,8 @@ def outcome_from_run(
     buffered_text: str,
     tokens: int = 0,
     cost: float | None = None,
+    *,
+    signals_fallback: str = "",
 ) -> TurnOutcome:
     """Build a TurnOutcome. ``cost is None`` means UNKNOWN (never coerced to 0.0)."""
     usage = getattr(run, "usage", None)
@@ -56,7 +67,7 @@ def outcome_from_run(
     agent_id = getattr(run, "agent_id", None)
     run_id = getattr(run, "id", None)
     return TurnOutcome(
-        signals=signals_from_run(run),
+        signals=signals_from_run(run, fallback_text=signals_fallback),
         verdict=parse_verdict_block(buffered_text),
         output_text=buffered_text,
         agent_id=agent_id if isinstance(agent_id, str) else None,
@@ -89,6 +100,7 @@ class TeeStream:
         self._turn_id = turn_id
         self._seq = 0
         self._parts: list[str] = []
+        self.status_error_text: str = ""
         self.raw_events: list[dict[str, object]] = []
 
     def drain(self) -> str:
@@ -99,7 +111,13 @@ class TeeStream:
         wait = getattr(self._run, "wait", None)
         if callable(wait):
             wait()
-        return "".join(self._parts)
+        buffered = "".join(self._parts)
+        if buffered.strip():
+            return buffered
+        # Some finished runs leave the terminal string on ``run.result`` even
+        # when the assistant stream was empty or already consumed.
+        result = getattr(self._run, "result", None)
+        return result if isinstance(result, str) else ""
 
     def _consume(self, message: object) -> None:
         kind = getattr(message, "type", None)
@@ -136,10 +154,14 @@ class TeeStream:
             self._ui.on_tool(name, str(payload["status"]))
 
     def _on_status(self, message: object) -> None:
+        status = _optional_str(getattr(message, "status", None)) or ""
+        text = _optional_str(getattr(message, "message", None)) or ""
         payload: dict[str, Any] = {
-            "status": _optional_str(getattr(message, "status", None)) or "",
-            "message": _optional_str(getattr(message, "message", None)) or "",
+            "status": status,
+            "message": text,
         }
+        if status.upper() == "ERROR" and text.strip():
+            self.status_error_text = text
         self._emit("status", payload)
         if self._ui is not None:
             self._ui.on_status(payload)

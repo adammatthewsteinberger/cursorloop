@@ -92,6 +92,18 @@ def test_errored_run_status_with_billing_text_is_credits() -> None:
     assert classify(signals, now=NOW) == CreditsExhausted(can_purchase=True)
 
 
+def test_live_bridge_out_of_usage_status_copy_is_credits() -> None:
+    """Observed Cursor bridge status ERROR when composer quota is spent."""
+    signals = TurnSignals(
+        run_status="error",
+        result_text=(
+            "Increase limits for faster responses You're out of usage. "
+            "Switch to Auto, or ask your admin to increase your limit to continue."
+        ),
+    )
+    assert classify(signals, now=NOW) == CreditsExhausted(can_purchase=True)
+
+
 def test_expired_run_is_a_window() -> None:
     assert classify(TurnSignals(run_status="expired"), now=NOW) == WindowExhausted(
         "run_expired", None

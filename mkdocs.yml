@@ -1,0 +1,51 @@
+site_name: cursorloop
+site_description: Autonomous Cursor Agent session runner
+repo_url: https://github.com/adammatthewsteinberger/cursorloop
+theme:
+  name: material
+exclude_docs: |
+  plans/**
+  superpowers/**
+nav:
+  - Home: index.md
+  - Getting started:
+      - Installation: getting-started/installation.md
+      - Quickstart: getting-started/quickstart.md
+      - Configuration: getting-started/configuration.md
+  - Guides:
+      - Autonomous runs: guides/autonomous-runs.md
+      - Rate limits and credits: guides/rate-limits-and-credits.md
+      - Never blocking: guides/never-blocking.md
+      - Completion detection: guides/completion-detection.md
+      - Model profiles: guides/model-profiles.md
+      - Logging: guides/logging-and-observability.md
+      - Live testing: guides/live-testing.md
+      - Cloud agents: guides/cloud-agents.md
+  - Architecture:
+      - Overview: architecture/overview.md
+      - Domain model: architecture/domain-model.md
+      - Ports and adapters: architecture/ports-and-adapters.md
+      - Run-loop state machine: architecture/run-loop.md
+      - ADR-0001 Onion: architecture/decisions/0001-onion-architecture.md
+      - ADR-0002 SDK: architecture/decisions/0002-cursor-sdk-over-cli.md
+      - ADR-0003 Credits: architecture/decisions/0003-credits-exhausted-non-waitable.md
+      - ADR-0004 Lexicon: architecture/decisions/0004-billing-lexicon-configurable.md
+      - ADR-0005 Ambiguity: architecture/decisions/0005-ambiguity-biases-credits.md
+      - ADR-0006 Cloud REST: architecture/decisions/0006-cloud-agents-rest-surface.md
+      - ADR-0007 Never-block: architecture/decisions/0007-never-block-hooks.md
+      - ADR-0008 Hooks restore: architecture/decisions/0008-hash-verified-hooks-restore.md
+      - ADR-0009 Completion: architecture/decisions/0009-completion-verdict-fence.md
+      - ADR-0010 Profiles: architecture/decisions/0010-composer-first-grok-profile.md
+  - Reference:
+      - CLI: reference/cli.md
+  - Contributing:
+      - Development: contributing/development.md
+      - Testing: contributing/testing.md
+      - Documentation: contributing/documentation.md
+      - Release: contributing/release.md
+plugins:
+  - search
+  - mkdocstrings:
+      handlers:
+        python:
+          paths: [src]

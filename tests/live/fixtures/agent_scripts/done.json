@@ -1,0 +1,10 @@
+{
+  "probes": [{"signals": {}}],
+  "turns": [
+    {
+      "signals": {},
+      "verdict": {"complete": true, "remaining_work": [], "blocked_on": null, "summary": "done"},
+      "output_text": "CURSORLOOP_TASK_FULLY_COMPLETE\n```cursorloop-verdict\n{\"complete\": true, \"remaining_work\": [], \"blocked_on\": null, \"summary\": \"done\"}\n```"
+    }
+  ]
+}
