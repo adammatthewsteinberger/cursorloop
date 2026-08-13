@@ -1,0 +1,106 @@
+name: CI
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    name: Lint & format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e ".[dev]"
+      - run: ruff check src tests
+      - run: ruff format --check src tests
+
+  typecheck:
+    name: mypy --strict
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e ".[dev]"
+      - run: mypy src/cursorloop
+
+  imports:
+    name: import-linter (onion contract)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e ".[dev]"
+      - run: lint-imports
+
+  security:
+    name: bandit + pip-audit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: "3.12"
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e ".[dev]"
+      - run: bandit -q -r src/cursorloop
+      - run: pip-audit
+
+  test:
+    name: pytest (py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - uses: actions/setup-python@v7.0.0
+        with:
+          python-version: ${{ matrix.python-version }}
+      - run: python -m pip install --upgrade pip
+      - run: pip install -e ".[dev]"
+      - name: Domain coverage floor (100%)
+        run: >
+          pytest tests
+          --cov=cursorloop.domain
+          --cov-report=term-missing
+          --cov-fail-under=100
+      - name: Application coverage floor (100%)
+        run: >
+          pytest tests
+          --cov=cursorloop.application
+          --cov-report=term-missing
+          --cov-fail-under=100
+      - name: Infrastructure coverage floor (85%)
+        run: >
+          pytest tests
+          --cov=cursorloop.infrastructure
+          --cov-report=term-missing
+          --cov-fail-under=85
+      - name: CLI coverage floor (85%)
+        run: >
+          pytest tests
+          --cov=cursorloop.cli
+          --cov-report=term-missing
+          --cov-fail-under=85
+      - name: Full suite
+        run: pytest
