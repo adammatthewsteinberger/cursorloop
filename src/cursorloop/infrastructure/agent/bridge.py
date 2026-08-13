@@ -29,6 +29,8 @@ class LiveBridge:
     client: Any
     agent: Any
     owns_client: bool = True
+    # (touched, previous): restore CURSOR_API_KEY on close when we exported one.
+    _api_key_env_backup: tuple[bool, str | None] = (False, None)
 
     def close(self) -> None:
         """Release resources.
@@ -47,6 +49,26 @@ class LiveBridge:
             if callable(shutdown):
                 with contextlib.suppress(Exception):
                     shutdown()
+        _restore_api_key_env(self._api_key_env_backup)
+
+
+def _export_api_key(api_key: str | None) -> tuple[bool, str | None]:
+    """Export ``CURSOR_API_KEY`` for the SDK bridge; return a restore token."""
+    if not api_key:
+        return (False, None)
+    previous = os.environ.get(_API_KEY_ENV)
+    os.environ[_API_KEY_ENV] = api_key
+    return (True, previous)
+
+
+def _restore_api_key_env(backup: tuple[bool, str | None]) -> None:
+    touched, previous = backup
+    if not touched:
+        return
+    if previous is None:
+        os.environ.pop(_API_KEY_ENV, None)
+    else:
+        os.environ[_API_KEY_ENV] = previous
 
 
 def launch_bridge_client(
@@ -54,18 +76,23 @@ def launch_bridge_client(
     *,
     api_key: str | None = None,
     launch_bridge: LaunchBridge | None = None,
-) -> Any:
+) -> tuple[Any, tuple[bool, str | None]]:
     """Start ``CursorClient.launch_bridge`` for ``workspace``.
 
     The SDK's ``launch_bridge`` does not accept an auth kwarg — it constructs
     ``CursorClient`` with ``allow_api_key_env_fallback=True`` and reads
     ``CURSOR_API_KEY``. When a key is supplied explicitly, export it into the
-    process env before launching so the bridge can authenticate.
+    process env before launching so the bridge can authenticate. The caller
+    must restore via the returned backup token (``LiveBridge.close`` does).
     """
-    if api_key:
-        os.environ[_API_KEY_ENV] = api_key
+    backup = _export_api_key(api_key)
     launcher = launch_bridge if launch_bridge is not None else CursorClient.launch_bridge
-    return launcher(workspace=str(workspace), allow_api_key_env_fallback=True)
+    try:
+        client = launcher(workspace=str(workspace), allow_api_key_env_fallback=True)
+    except Exception:
+        _restore_api_key_env(backup)
+        raise
+    return client, backup
 
 
 def open_live_bridge(
@@ -81,19 +108,35 @@ def open_live_bridge(
 ) -> LiveBridge:
     """Launch (or reuse) a bridge client and create/resume a durable Agent."""
     owns_client = client is None
-    live_client = (
-        client
-        if client is not None
-        else launch_bridge_client(workspace, api_key=api_key, launch_bridge=launch_bridge)
-    )
+    if client is not None:
+        live_client = client
+        backup: tuple[bool, str | None] = (False, None)
+    else:
+        live_client, backup = launch_bridge_client(
+            workspace, api_key=api_key, launch_bridge=launch_bridge
+        )
     options = build_agent_options(profile=profile, cwd=str(workspace))
     create = create_agent if create_agent is not None else Agent.create
     resume = resume_agent if resume_agent is not None else Agent.resume
     create_kwargs: dict[str, Any] = {"options": options, "client": live_client}
     if api_key:
         create_kwargs["api_key"] = api_key
-    if resume_agent_id:
-        agent = resume(resume_agent_id, options=options, client=live_client)
-    else:
-        agent = create(**create_kwargs)
-    return LiveBridge(client=live_client, agent=agent, owns_client=owns_client)
+    try:
+        if resume_agent_id:
+            agent = resume(resume_agent_id, options=options, client=live_client)
+        else:
+            agent = create(**create_kwargs)
+    except Exception:
+        _restore_api_key_env(backup)
+        if owns_client:
+            shutdown = getattr(live_client, "close", None)
+            if callable(shutdown):
+                with contextlib.suppress(Exception):
+                    shutdown()
+        raise
+    return LiveBridge(
+        client=live_client,
+        agent=agent,
+        owns_client=owns_client,
+        _api_key_env_backup=backup,
+    )
