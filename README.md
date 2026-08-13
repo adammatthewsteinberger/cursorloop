@@ -1,0 +1,23 @@
+# cursorloop
+
+Autonomous Cursor Agent session runner (Composer-first; Grok as a secondary model profile). Same job as [claudeloop](https://github.com/adammatthewsteinberger/claudeloop): never block on a human, and never treat billing exhaustion as a waitable rate-limit window.
+
+**Status:** planning only. Product source is not scaffolded yet.
+
+## Plans
+
+| Document | Purpose |
+|---|---|
+| [docs/plans/architecture-and-roadmap.md](docs/plans/architecture-and-roadmap.md) | Full design / transplant plan from claudeloop 0.5.4 |
+| [docs/plans/research-notes.md](docs/plans/research-notes.md) | Vendor SDK/CLI capacity + autonomy research |
+| [docs/plans/_shared-transplant-outline.md](docs/plans/_shared-transplant-outline.md) | Cross-product keep/swap + Global Constraints |
+| [docs/superpowers/plans/2026-08-13-cursorloop-implementation.md](docs/superpowers/plans/2026-08-13-cursorloop-implementation.md) | Bite-sized TDD implementation plan |
+
+## Naming
+
+| Item | Value |
+|---|---|
+| PyPI / CLI | `cursorloop` |
+| Env prefix | `CURSORLOOP_*` |
+| State dir | `.cursorloop/` |
+| Done marker | `CURSORLOOP_TASK_FULLY_COMPLETE` |
