@@ -10,6 +10,7 @@ from cursorloop.infrastructure.agent.hooks import ManagedHooks
 from cursorloop.infrastructure.git_savepoints import GitSavePointStore
 from cursorloop.infrastructure.rundir import list_run_directories, resolve_run_directory
 from cursorloop.infrastructure.snapshot import FileRunSnapshotSink
+from cursorloop.infrastructure.stream_ui import StreamUiApp
 
 
 def stop(
@@ -59,12 +60,20 @@ def logs(
 def watch(
     run_id: str | None = typer.Option(None, "--run-id"),
     cwd_dir: Path | None = typer.Option(None, "--cwd", exists=True, file_okay=False),
+    ui: bool = typer.Option(False, "--ui", help="Launch the Textual stream UI when available"),
 ) -> None:
-    """Tail the run event stream (plain text; Textual UI lands in M5)."""
+    """Tail the run event stream (plain text; optional Textual UI via --ui)."""
     cwd = cwd_dir.resolve() if cwd_dir is not None else Path.cwd()
     directory = resolve_run_directory(cwd, run_id)
+    text = ""
     if directory.events_path.is_file():
-        typer.echo(directory.events_path.read_text(encoding="utf-8"), nl=False)
+        text = directory.events_path.read_text(encoding="utf-8")
+        typer.echo(text, nl=False)
+    if ui:
+        app_ui = StreamUiApp()
+        for line in text.splitlines():
+            app_ui.on_delta(line)
+        app_ui.run()
 
 
 def runs(

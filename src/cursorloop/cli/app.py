@@ -22,6 +22,7 @@ from cursorloop.cli.commands.control_cmds import (
 from cursorloop.cli.commands.doctor import doctor
 from cursorloop.cli.commands.resume import resume
 from cursorloop.cli.commands.run import run
+from cursorloop.cli.man_page import render_man_page
 
 app = typer.Typer(
     name="cursorloop",
@@ -74,6 +75,12 @@ def _version_callback(value: bool) -> None:
         raise typer.Exit(code=0)
 
 
+def _man_callback(value: bool) -> None:
+    if value:
+        typer.echo(render_man_page())
+        raise typer.Exit(code=0)
+
+
 @app.callback()
 def _root(
     version: bool = typer.Option(
@@ -83,5 +90,12 @@ def _root(
         is_eager=True,
         help="Show version and exit",
     ),
+    man: bool = typer.Option(
+        False,
+        "--man",
+        callback=_man_callback,
+        is_eager=True,
+        help="Show the man-page style reference and exit",
+    ),
 ) -> None:
-    del version
+    del version, man
