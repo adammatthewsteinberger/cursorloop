@@ -1,11 +1,42 @@
 site_name: cursorloop
-site_description: Autonomous Cursor Agent session runner
+site_description: >-
+  Onion-architected, autonomous Cursor Agent session runner — never blocks on
+  a human, distinguishes rate-limit windows from exhausted credits, and resumes
+  safely across usage windows.
+site_url: https://adammatthewsteinberger.github.io/cursorloop/
 repo_url: https://github.com/adammatthewsteinberger/cursorloop
+repo_name: adammatthewsteinberger/cursorloop
+edit_uri: edit/develop/docs/
+
 theme:
   name: material
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: teal
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: teal
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  features:
+    - navigation.instant
+    - navigation.tracking
+    - navigation.sections
+    - navigation.top
+    - content.code.copy
+    - content.action.edit
+    - search.suggest
+    - search.highlight
+
 exclude_docs: |
   plans/**
   superpowers/**
+
 nav:
   - Home: index.md
   - Getting started:
@@ -43,9 +74,24 @@ nav:
       - Testing: contributing/testing.md
       - Documentation: contributing/documentation.md
       - Release: contributing/release.md
+
 plugins:
   - search
   - mkdocstrings:
       handlers:
         python:
           paths: [src]
+          options:
+            show_source: true
+            show_root_heading: true
+            docstring_style: google
+
+markdown_extensions:
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.highlight
+  - pymdownx.inlinehilite
+  - tables
+  - toc:
+      permalink: true
