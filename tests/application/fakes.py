@@ -4,7 +4,7 @@ Protocols, so no test ever waits on a human or calls time.sleep() for real.
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
 from cursorloop.application.dto import TurnOutcome
@@ -55,6 +55,10 @@ class FakeClock:
             raise ValueError("FakeClock is monotonic")
         self._now = instant
 
+    def advance(self, delta: timedelta) -> None:
+        """Advance by a timedelta. Refuses to run backwards (negative delta)."""
+        self.advance_to(self._now + delta)
+
 
 class FakeSleeper:
     """sleep_until() jumps the paired FakeClock to the target instant.
@@ -77,6 +81,19 @@ class FakeSleeper:
             return
         self.total_simulated_seconds += delta
         self._clock.advance_to(instant)
+
+
+class FakeRun:
+    """Synthetic Run handle for the stall watchdog. Not unittest.mock."""
+
+    def __init__(self, status: str = "running") -> None:
+        self.status = status
+        self.cancel_calls = 0
+
+    def cancel(self) -> None:
+        self.cancel_calls += 1
+        if self.status == "running":
+            self.status = "cancelled"
 
 
 class FakeAgentGateway:

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import anyio
 import pytest
@@ -58,6 +58,26 @@ def test_fake_clock_is_settable_and_refuses_to_run_backwards() -> None:
     assert clock.now() == later
     with pytest.raises(ValueError, match="monotonic"):
         clock.advance_to(start)
+
+
+def test_fake_clock_advance_is_monotonic() -> None:
+    start = datetime(2026, 8, 13, 12, 0, tzinfo=UTC)
+    clock = fakes.FakeClock(start)
+    clock.advance(timedelta(minutes=11))
+    assert clock.now() == start.replace(hour=12, minute=11)
+    with pytest.raises(ValueError, match="monotonic"):
+        clock.advance(timedelta(minutes=-1))
+
+
+def test_fake_run_records_cancel_calls() -> None:
+    run = fakes.FakeRun(status="running")
+    run.cancel()
+    assert run.cancel_calls == 1
+    assert run.status == "cancelled"
+    finished = fakes.FakeRun(status="finished")
+    finished.cancel()
+    assert finished.cancel_calls == 1
+    assert finished.status == "finished"
 
 
 def test_fake_sleeper_does_not_rewind_the_clock_for_a_past_instant() -> None:

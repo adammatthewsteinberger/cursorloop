@@ -219,5 +219,11 @@ def fake_usage_message(*, total_tokens: int = 9) -> FakeUsageMessage:
     return FakeUsageMessage(usage=FakeTokenUsage(total_tokens=total_tokens))
 
 
+def fake_model_catalog(ids: Sequence[str]) -> list[str]:
+    """Synthetic live catalog of model ids. The catalog, not a constant, is
+    the source of truth — Cursor ships models faster than we ship releases."""
+    return list(ids)
+
+
 def _assistant_message(text: str) -> FakeAssistantMessage:
     return FakeAssistantMessage(message=FakeAssistantContent(content=(FakeTextBlock(text=text),)))
