@@ -21,6 +21,10 @@ DEFAULT_BILLING_TERMS: tuple[str, ...] = (
     "usage_limit_reached",
     "usage_limit_exceeded",
     "usage_exceeded",
+    # Live Cursor bridge status copy (not snake_case API codes):
+    # "You're out of usage. … increase your limit …"
+    "out_of_usage",
+    "increase_your_limit",
     "included_usage",
     "plan_limit",
     "plan_quota",

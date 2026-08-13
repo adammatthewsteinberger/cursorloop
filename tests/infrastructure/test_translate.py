@@ -203,6 +203,38 @@ def test_tee_forwards_tool_and_status_to_stream_ui_without_a_sink() -> None:
     assert ui.statuses == [{"status": "running", "message": "working"}]
 
 
+def test_status_error_text_is_captured_for_classifier_fallback() -> None:
+    run = sdk_payloads.fake_run(
+        status="error",
+        result="",
+        messages=(
+            sdk_payloads.fake_status_message(status="RUNNING", message=""),
+            sdk_payloads.fake_status_message(
+                status="ERROR",
+                message="You're out of usage. Switch to Auto.",
+            ),
+        ),
+    )
+    tee = TeeStream(run)
+    assert tee.drain() == ""
+    assert tee.status_error_text == "You're out of usage. Switch to Auto."
+    outcome = outcome_from_run(run, "", signals_fallback=tee.status_error_text)
+    assert outcome.signals.run_status == "error"
+    assert "out of usage" in outcome.signals.result_text.lower()
+    assert outcome.output_text == ""
+
+
+def test_drain_falls_back_to_run_result_when_stream_has_no_assistant_text() -> None:
+    run = sdk_payloads.fake_run(status="finished", result="HELLO_SMOKE", messages=())
+    assert TeeStream(run).drain() == "HELLO_SMOKE"
+
+
+def test_signals_from_run_prefers_non_empty_result_over_fallback() -> None:
+    run = sdk_payloads.fake_run(status="error", result="add credits please")
+    signals = signals_from_run(run, fallback_text="You're out of usage")
+    assert signals.result_text == "add credits please"
+
+
 class FakeStreamUi:
     """Tiny StreamUi double — no infrastructure import from application."""
 

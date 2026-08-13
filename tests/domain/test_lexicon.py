@@ -13,6 +13,14 @@ def test_matches_are_case_insensitive_and_report_the_term() -> None:
     assert lex.matches("Your USAGE_LIMIT_REACHED for this month") == "usage_limit_reached"
 
 
+def test_out_of_usage_bridge_copy_matches_billing() -> None:
+    lex = BillingLexicon(DEFAULT_BILLING_TERMS)
+    matched = lex.matches(
+        "You're out of usage. Switch to Auto, or ask your admin to increase your limit"
+    )
+    assert matched in {"out_of_usage", "increase_your_limit"}
+
+
 def test_no_match_returns_none() -> None:
     assert BillingLexicon(DEFAULT_BILLING_TERMS).matches("connection reset by peer") is None
 
@@ -46,6 +54,8 @@ def test_default_billing_terms_include_all_tiers_in_order() -> None:
         "usage_limit_reached",
         "usage_limit_exceeded",
         "usage_exceeded",
+        "out_of_usage",
+        "increase_your_limit",
         "included_usage",
         "plan_limit",
         "plan_quota",

@@ -28,7 +28,7 @@ def test_open_live_bridge_creates_agent_with_injected_launcher(tmp_path: Path) -
     )
     assert isinstance(bridge, LiveBridge)
     assert calls["launch"]["workspace"] == str(tmp_path)
-    assert calls["launch"]["auth_token"] == "crsr_test"
+    assert calls["launch"].get("allow_api_key_env_fallback") is True
     assert calls["create"]["client"] is bridge.client
     bridge.close()
     assert calls.get("closed") is True

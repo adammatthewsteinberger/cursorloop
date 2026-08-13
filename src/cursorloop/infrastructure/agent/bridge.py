@@ -6,6 +6,8 @@ while the composition root still owns when the bridge starts and stops.
 
 from __future__ import annotations
 
+import contextlib
+import os
 from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,6 +19,7 @@ from cursorloop.domain.model_profile import ModelProfile
 from cursorloop.infrastructure.agent.options import build_agent_options
 
 LaunchBridge = Callable[..., Any]
+_API_KEY_ENV = "CURSOR_API_KEY"
 
 
 @dataclass(frozen=True, slots=True)
@@ -28,13 +31,22 @@ class LiveBridge:
     owns_client: bool = True
 
     def close(self) -> None:
+        """Release resources.
+
+        Agent close is primarily owned by ``CursorAgentGateway.close`` (runner
+        ``finally``). This method still attempts agent close for callers that
+        never entered the runner, but suppresses already-gone agents so the
+        CLI ``built.close()`` path cannot crash after a successful turn.
+        """
         closer = getattr(self.agent, "close", None)
         if callable(closer):
-            closer()
+            with contextlib.suppress(Exception):
+                closer()
         if self.owns_client:
             shutdown = getattr(self.client, "close", None)
             if callable(shutdown):
-                shutdown()
+                with contextlib.suppress(Exception):
+                    shutdown()
 
 
 def launch_bridge_client(
@@ -45,14 +57,15 @@ def launch_bridge_client(
 ) -> Any:
     """Start ``CursorClient.launch_bridge`` for ``workspace``.
 
-    Passes ``auth_token`` when an API key is available; otherwise the SDK may
-    fall back to ``CURSOR_API_KEY`` when allowed.
+    The SDK's ``launch_bridge`` does not accept an auth kwarg — it constructs
+    ``CursorClient`` with ``allow_api_key_env_fallback=True`` and reads
+    ``CURSOR_API_KEY``. When a key is supplied explicitly, export it into the
+    process env before launching so the bridge can authenticate.
     """
-    launcher = launch_bridge if launch_bridge is not None else CursorClient.launch_bridge
-    kwargs: dict[str, Any] = {"workspace": str(workspace)}
     if api_key:
-        kwargs["auth_token"] = api_key
-    return launcher(**kwargs)
+        os.environ[_API_KEY_ENV] = api_key
+    launcher = launch_bridge if launch_bridge is not None else CursorClient.launch_bridge
+    return launcher(workspace=str(workspace), allow_api_key_env_fallback=True)
 
 
 def open_live_bridge(
@@ -76,8 +89,11 @@ def open_live_bridge(
     options = build_agent_options(profile=profile, cwd=str(workspace))
     create = create_agent if create_agent is not None else Agent.create
     resume = resume_agent if resume_agent is not None else Agent.resume
+    create_kwargs: dict[str, Any] = {"options": options, "client": live_client}
+    if api_key:
+        create_kwargs["api_key"] = api_key
     if resume_agent_id:
         agent = resume(resume_agent_id, options=options, client=live_client)
     else:
-        agent = create(options=options, client=live_client)
+        agent = create(**create_kwargs)
     return LiveBridge(client=live_client, agent=agent, owns_client=owns_client)

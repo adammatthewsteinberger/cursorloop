@@ -145,7 +145,7 @@ def build_runner(
             watchdog=watchdog,
             event_sink=event_sink,
         )
-        probe = CursorCapacityProbe(str(cwd), profile)
+        probe = CursorCapacityProbe(str(cwd), profile, client=bridge.client)
 
     hooks: HookManager
     if config.managed_hooks:
