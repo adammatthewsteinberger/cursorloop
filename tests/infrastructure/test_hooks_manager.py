@@ -214,6 +214,38 @@ def test_crash_after_restore_metadata_leaves_original_hooks_recoverable(
     assert hooks_file.read_text() == original
 
 
+def test_retry_install_completes_a_recorded_but_unapplied_merge(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Metadata-before-mutate plus SIGKILL leaves is_installed True while
+    hooks.json is still the original. The next run must finish the merge,
+    not no-op install and spend the session without allow hooks."""
+    hooks_file = tmp_path / ".cursor" / "hooks.json"
+    hooks_file.parent.mkdir(parents=True)
+    original = json.dumps({"version": 1, "hooks": {"afterFileEdit": [{"command": "./fmt.sh"}]}})
+    hooks_file.write_text(original)
+
+    crashing = ManagedHooks(workspace=tmp_path, state_dir=tmp_path / ".cursorloop")
+    real_atomic_write = crashing._atomic_write
+
+    def crash_on_hooks_file(path: Path, data: bytes) -> None:
+        if path == crashing._hooks_file:
+            raise OSError("simulated crash during hooks.json write")
+        real_atomic_write(path, data)
+
+    monkeypatch.setattr(crashing, "_atomic_write", crash_on_hooks_file)
+    with pytest.raises(OSError, match="simulated crash"):
+        crashing.install()
+
+    retried = ManagedHooks(workspace=tmp_path, state_dir=tmp_path / ".cursorloop")
+    assert retried.is_installed() is True
+    retried.install()
+
+    merged = json.loads(hooks_file.read_text())
+    assert {"command": "./fmt.sh"} in merged["hooks"]["afterFileEdit"]
+    assert merged["hooks"]["preToolUse"]
+
+
 def test_install_does_not_snapshot_merged_hooks_as_original_when_state_is_missing(
     tmp_path: Path,
 ) -> None:

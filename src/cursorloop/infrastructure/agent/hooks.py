@@ -97,7 +97,7 @@ class ManagedHooks:
         self._stop_capture = self._state_dir / _STOP_CAPTURE
 
     def install(self) -> None:
-        if self.is_installed():
+        if self.is_installed() and not self._recorded_install_unapplied():
             return
         self._state_dir.mkdir(parents=True, exist_ok=True)
         self._scripts_dir.mkdir(parents=True, exist_ok=True)
@@ -159,6 +159,14 @@ class ManagedHooks:
 
     def is_installed(self) -> bool:
         return isinstance(self._read_state().get("hooks_merged_sha256"), str)
+
+    def _recorded_install_unapplied(self) -> bool:
+        """True when state was recorded but hooks.json is still the original."""
+        original_hash = self._read_state().get("hooks_original_sha256")
+        if not isinstance(original_hash, str):
+            return False
+        current = self._hooks_file.read_bytes() if self._hooks_file.exists() else b""
+        return _sha256(current) == original_hash
 
     def diff(self) -> str:
         original = self._hooks_file.read_bytes() if self._hooks_file.exists() else b""
