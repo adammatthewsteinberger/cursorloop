@@ -32,6 +32,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7.0.1
+        with:
+          # TestPyPI dry-runs always build `develop`, regardless of which
+          # branch the workflow_dispatch UI selected. Real PyPI builds the
+          # release tag (on main) via github.sha. Do not publish main tip
+          # to TestPyPI.
+          ref: ${{ github.event_name == 'workflow_dispatch' && 'develop' || github.sha }}
 
       - uses: actions/setup-python@v7.0.0
         with:
