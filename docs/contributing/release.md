@@ -59,12 +59,16 @@ real `0.1.0`.
 
 ## TestPyPI dry run
 
-Before the first real PyPI publish, validate the whole OIDC + build pipeline
-against **TestPyPI**:
+Before promoting `develop` → `main` (or cutting a release), validate the
+OIDC + build pipeline against **TestPyPI**. The workflow **always builds
+`develop`** for TestPyPI — never `main`. Real PyPI only publishes from a
+GitHub Release on `main`.
 
 1. Pending publisher registered at `test.pypi.org` (separate account /
    registry from `pypi.org`).
-2. Actions → **Publish to PyPI** → Run workflow → target `testpypi`.
+2. Actions → **Publish to PyPI** → Run workflow → target `testpypi`
+   (branch selection in the UI is ignored; checkout is forced to
+   `develop`).
 3. Approve the `testpypi` environment.
 4. Install and smoke:
 
@@ -83,15 +87,16 @@ against **TestPyPI**:
 ## First public 0.1.0
 
 1. Merge feature work → `develop` (green CI + CODEOWNER).
-2. Merge `develop` → `main` as a **merge commit**.
-3. `workflow_dispatch` TestPyPI; approve `testpypi`; confirm install.
+2. `workflow_dispatch` TestPyPI (builds `develop`); approve `testpypi`;
+   confirm install.
+3. Merge `develop` → `main` as a **merge commit**.
 4. Create the GitHub Release on `main`:
 
    ```bash
    gh release create v0.1.0 --target main --title "v0.1.0" --notes-file CHANGELOG.md
    ```
 
-   That fires `release: published` → approve env `pypi`.
+   That fires `release: published` → approve env `pypi` (main only).
 5. Confirm `https://pypi.org/project/cursorloop/`, `pip install cursorloop`,
    and `cursorloop --help`.
 
