@@ -143,5 +143,18 @@ type = "forbidden"
 source_modules = ["cursorloop.domain"]
 forbidden_modules = ["cursor_sdk", "typer", "structlog", "httpx", "anyio", "textual"]
 
+
+[[tool.importlinter.contracts]]
+name = "Interfaces declare seams, never consume them"
+type = "forbidden"
+source_modules = ["cursorloop.application.interfaces"]
+forbidden_modules = [
+    "cursorloop.application.runner",
+    "cursorloop.application.usecases",
+    "cursorloop.infrastructure",
+    "cursorloop.cli",
+    "cursorloop.bootstrap",
+]
+
 [tool.hatch.build.targets.wheel.force-include]
 "src/cursorloop/infrastructure/api/cloud-agents-openapi.yaml" = "cursorloop/infrastructure/api/cloud-agents-openapi.yaml"
