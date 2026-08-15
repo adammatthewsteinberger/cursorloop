@@ -18,6 +18,7 @@ from cursorloop.application.ports import AgentCatalog, AgentGateway, CapacityPro
 from cursorloop.application.runner import AutonomousRunner, RunnerContext
 from cursorloop.domain.budget import Budget
 from cursorloop.domain.model_profile import SHIPPED_PRESETS, ModelProfile
+from cursorloop.domain.verbosity import LogPlan
 from cursorloop.domain.waiting import DEFAULT_WAIT_POLICY_CONFIG
 from cursorloop.infrastructure.agent.bridge import LiveBridge, open_live_bridge
 from cursorloop.infrastructure.agent.catalog import CursorAgentCatalog
@@ -32,7 +33,11 @@ from cursorloop.infrastructure.config import RunnerConfig
 from cursorloop.infrastructure.control import FileRunControl
 from cursorloop.infrastructure.events import JsonlRunEventSink
 from cursorloop.infrastructure.lock import FileAgentLock
-from cursorloop.infrastructure.logging import StructlogAppLogger, configure_logging
+from cursorloop.infrastructure.logging import (
+    StructlogAppLogger,
+    apply_third_party_level,
+    configure_logging,
+)
 from cursorloop.infrastructure.notify import StderrNotifier
 from cursorloop.infrastructure.progress import ConsoleProgressReporter
 from cursorloop.infrastructure.rundir import RunDirectory, runs_root_for
@@ -81,13 +86,16 @@ def build_runner(
     resume_agent_id: str | None = None,
     client: Any | None = None,
     launch_bridge: Any | None = None,
+    run_id: str | None = None,
 ) -> BuiltRunner:
     """Assemble an AutonomousRunner for a fresh or resumed run.
 
     When the scripted test-agent gate is off and no ``client`` is supplied,
     launches ``CursorClient.launch_bridge(workspace=…)`` automatically.
     """
-    run_dir = RunDirectory.create(runs_root_for(cwd), cwd=cwd, plan_path=plan_path)
+    run_dir = RunDirectory.create(runs_root_for(cwd), cwd=cwd, plan_path=plan_path, run_id=run_id)
+    # Rebind to the resolved id: identical to the supplied one when the caller
+    # named the run, the freshly minted one otherwise.
     run_id = run_dir.read_meta().run_id
     trace_id = str(uuid.uuid4())
     state_root = cwd / ".cursorloop"
@@ -191,3 +199,9 @@ def build_runner(
 
 def build_catalog(*, client: Any) -> AgentCatalog:
     return CursorAgentCatalog(client)
+
+
+def configure_cli_logging(*, plan: LogPlan, log_file: Path | None = None) -> None:
+    """Apply the resolved -v / -q / --log-level plan to this process."""
+    configure_logging(log_file=log_file, level=plan.level)
+    apply_third_party_level(plan)

@@ -36,6 +36,7 @@ from cursorloop.domain.classify import TurnSignals
 from cursorloop.domain.completion import StructuredVerdict
 from cursorloop.domain.control import ControlCommand
 from cursorloop.domain.faults import Busy, ConfigFault, Fault, TransientFault
+from cursorloop.domain.forecast import WindDownPolicy
 from cursorloop.domain.model_profile import ModelProfile
 from cursorloop.domain.plan import WorkPlan
 from cursorloop.domain.waiting import DEFAULT_PROGRESS_WAIT_CONFIG, DEFAULT_WAIT_POLICY_CONFIG
@@ -412,6 +413,8 @@ def build_runner(
     plan: WorkPlan | None = None,
     budget: Budget | None = None,
     continue_prompt: str = "Continue exactly where you left off.",
+    handoff_marker_writer: object | None = None,
+    wind_down_policy: WindDownPolicy | None = None,
 ) -> AutonomousRunner:
     """Wire an AutonomousRunner with fakes for every port it needs."""
     clock = clock if clock is not None else FakeClock()
@@ -438,5 +441,7 @@ def build_runner(
         run_id=run_id,
         plan=plan,
         continue_prompt=continue_prompt,
+        handoff_marker_writer=handoff_marker_writer,  # type: ignore[arg-type]
+        wind_down_policy=wind_down_policy or WindDownPolicy(),
     )
     return AutonomousRunner(ctx)
