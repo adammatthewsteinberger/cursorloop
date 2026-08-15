@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import typer
 
-from cursorloop import __version__
+from cursorloop import __version__, bootstrap
 from cursorloop.cli.commands.agents import agents, hooks, models, usage, whoami
 from cursorloop.cli.commands.cloud import cloud_app
 from cursorloop.cli.commands.control_cmds import (
@@ -23,6 +25,7 @@ from cursorloop.cli.commands.doctor import doctor
 from cursorloop.cli.commands.resume import resume
 from cursorloop.cli.commands.run import run
 from cursorloop.cli.man_page import render_man_page
+from cursorloop.domain.verbosity import resolve_log_plan
 
 app = typer.Typer(
     name="cursorloop",
@@ -97,5 +100,25 @@ def _root(
         is_eager=True,
         help="Show the man-page style reference and exit",
     ),
+    verbose: int = typer.Option(
+        0,
+        "--verbose",
+        "-v",
+        count=True,
+        help="More detail: -v debug, -vv also third-party libraries, -vvv full payloads.",
+    ),
+    quiet: bool = typer.Option(False, "--quiet", "-q", help="Warnings and errors only."),
+    log_level: str | None = typer.Option(
+        None, "--log-level", help="DEBUG, INFO, WARNING, ERROR or CRITICAL. Overrides -v."
+    ),
+    log_file: Path | None = typer.Option(
+        None, "--log-file", help="Also write redacted JSON lines to this file."
+    ),
 ) -> None:
     del version, man
+    try:
+        plan = resolve_log_plan(verbose=verbose, quiet=quiet, log_level=log_level)
+    except ValueError as exc:
+        typer.echo(f"Error: {exc}", err=True)
+        raise typer.Exit(code=2) from exc
+    bootstrap.configure_cli_logging(plan=plan, log_file=log_file)

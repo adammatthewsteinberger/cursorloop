@@ -18,6 +18,7 @@ from cursorloop.application.ports import AgentCatalog, AgentGateway, CapacityPro
 from cursorloop.application.runner import AutonomousRunner, RunnerContext
 from cursorloop.domain.budget import Budget
 from cursorloop.domain.model_profile import SHIPPED_PRESETS, ModelProfile
+from cursorloop.domain.verbosity import LogPlan
 from cursorloop.domain.waiting import DEFAULT_WAIT_POLICY_CONFIG
 from cursorloop.infrastructure.agent.bridge import LiveBridge, open_live_bridge
 from cursorloop.infrastructure.agent.catalog import CursorAgentCatalog
@@ -32,7 +33,11 @@ from cursorloop.infrastructure.config import RunnerConfig
 from cursorloop.infrastructure.control import FileRunControl
 from cursorloop.infrastructure.events import JsonlRunEventSink
 from cursorloop.infrastructure.lock import FileAgentLock
-from cursorloop.infrastructure.logging import StructlogAppLogger, configure_logging
+from cursorloop.infrastructure.logging import (
+    StructlogAppLogger,
+    apply_third_party_level,
+    configure_logging,
+)
 from cursorloop.infrastructure.notify import StderrNotifier
 from cursorloop.infrastructure.progress import ConsoleProgressReporter
 from cursorloop.infrastructure.rundir import RunDirectory, runs_root_for
@@ -194,3 +199,9 @@ def build_runner(
 
 def build_catalog(*, client: Any) -> AgentCatalog:
     return CursorAgentCatalog(client)
+
+
+def configure_cli_logging(*, plan: LogPlan, log_file: Path | None = None) -> None:
+    """Apply the resolved -v / -q / --log-level plan to this process."""
+    configure_logging(log_file=log_file, level=plan.level)
+    apply_third_party_level(plan)
