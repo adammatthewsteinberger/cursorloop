@@ -182,3 +182,35 @@ def test_run_failed_turn_prints_reason(monkeypatch, tmp_path: Path) -> None:
     assert result.exit_code == 3
     combined = (result.stdout or "") + (result.stderr or "")
     assert "Run failed" in combined or "authentication" in combined.lower()
+
+
+def test_run_rejects_a_run_id_that_would_escape_the_runs_root(tmp_path: Path) -> None:
+    """A run id becomes a path segment, so traversal has to be refused before
+    anything is created -- and refused with a message, not a traceback."""
+    plan = tmp_path / "plan.md"
+    plan.write_text("# Plan\n\nDo the thing.\n")
+    result = runner.invoke(
+        app,
+        ["run", "--plan", str(plan), "--cwd", str(tmp_path), "--run-id", "../escape"],
+    )
+    assert result.exit_code == 2
+    combined = (result.stdout or "") + (result.stderr or "")
+    assert "invalid run id" in combined
+    assert not (tmp_path.parent / "escape").exists()
+
+
+def test_run_refuses_to_reuse_an_existing_run_id(tmp_path: Path) -> None:
+    """Silently reopening someone else's run directory would interleave two
+    runs' events in one log."""
+    from cursorloop.infrastructure.rundir import RunDirectory, runs_root_for
+
+    plan = tmp_path / "plan.md"
+    plan.write_text("# Plan\n\nDo the thing.\n")
+    RunDirectory.create(runs_root_for(tmp_path), cwd=tmp_path, run_id="taken")
+
+    result = runner.invoke(
+        app, ["run", "--plan", str(plan), "--cwd", str(tmp_path), "--run-id", "taken"]
+    )
+    assert result.exit_code == 2
+    combined = (result.stdout or "") + (result.stderr or "")
+    assert "already exists" in combined
