@@ -20,6 +20,7 @@ from cursorloop.domain.capacity import (
     WindowExhausted,
 )
 from cursorloop.domain.completion import Blocked, CompletionVerdict, Continue, Done
+from cursorloop.domain.forecast import CapacityForecast, WindDown
 from cursorloop.domain.waiting import (
     DEFAULT_PROGRESS_WAIT_CONFIG,
     DEFAULT_WAIT_POLICY_CONFIG,
@@ -39,6 +40,7 @@ class Phase(Enum):
     PROBING = auto()
     COMPLETE = auto()
     FAILED = auto()
+    HANDOFF = auto()
 
 
 @dataclass(frozen=True, slots=True)
@@ -78,7 +80,21 @@ class DelayThenSend:
     at: datetime
 
 
-Decision = SendTurn | RunProbe | ScheduleProbe | DelayThenSend | Finish
+@dataclass(frozen=True, slots=True)
+class WindDownAndFinish:
+    """Stop cleanly *before* capacity runs out, so the handoff artifacts can
+    still be produced with room to spare.
+
+    Distinct from Finish: the work is not done and not blocked, it is being
+    handed over. A supervisor reads this as "resume me elsewhere", not "this
+    failed".
+    """
+
+    reason: str
+    forecast: CapacityForecast
+
+
+Decision = SendTurn | RunProbe | ScheduleProbe | DelayThenSend | WindDownAndFinish | Finish
 
 
 def decide_progress_delay(
@@ -127,6 +143,7 @@ def decide_after_turn(
     tokens: int = 0,
     dollars: float | None = None,
     started_at: datetime | None = None,
+    wind_down: WindDown | None = None,
 ) -> tuple[RunState, Decision]:
     """Called once a real turn has completed. A capacity rejection always outranks a
     completion claim — a limit message truncating mid-response could coincidentally
@@ -171,6 +188,11 @@ def decide_after_turn(
     running = RunState(phase=Phase.RUNNING, ledger=new_ledger)
     if _budget_exhausted(new_ledger, now=now, started_at=started_at):
         return _fail(running, "budget exhausted"), Finish(success=False, reason="budget exhausted")
+    if wind_down is not None:
+        return (
+            RunState(phase=Phase.HANDOFF, ledger=new_ledger),
+            WindDownAndFinish(reason=wind_down.reason, forecast=wind_down.forecast),
+        )
     return running, SendTurn()
 
 

@@ -13,6 +13,8 @@ from cursorloop.domain.budget import Budget
 from cursorloop.domain.capacity import AuthenticationFailed, Available, CreditsExhausted
 from cursorloop.domain.control import Prompt, Stop
 from cursorloop.domain.faults import Busy, ConfigFault, TransientFault
+from cursorloop.domain.forecast import WindDownPolicy
+from cursorloop.domain.handoff_marker import HandoffMarker
 from cursorloop.domain.plan import WorkPlan
 from tests.application import fakes
 
@@ -414,3 +416,54 @@ def test_busy_send_script_terminates_without_hanging() -> None:
     assert gateway.force_flags == [False, True, True, True]
     assert sleeper.real_sleep_calls == 0
     assert sleeper.wait_log
+
+
+async def test_a_wind_down_finishes_with_a_marker_rather_than_success() -> None:
+    """A supervisor has to tell "resume me elsewhere" from "this is done"."""
+    markers: list[HandoffMarker] = []
+    runner = fakes.build_runner(
+        gateway=fakes.FakeAgentGateway(
+            [fakes.turn(done=False), fakes.turn(done=True, summary="done")]
+        ),
+        # One turn of headroom against a reserve of two: the first completed
+        # turn is already inside the reserve.
+        budget=Budget(max_turns=2, max_cost_usd=10.0),
+        handoff_marker_writer=markers.append,
+        wind_down_policy=WindDownPolicy(enabled=True),
+    )
+
+    result = await runner.run(initial_prompt="start")
+
+    assert result.success is False
+    assert result.reason.startswith("wind-down:")
+    assert markers, "a wind-down must leave a handoff marker"
+    assert markers[0].reason == "turn_reserve"
+
+
+async def test_a_wind_down_without_a_writer_still_finishes_cleanly() -> None:
+    """No writer means no marker, which is the honest signal: a supervisor that
+    finds no handoff.json falls back to the reactive path."""
+    runner = fakes.build_runner(
+        gateway=fakes.FakeAgentGateway(
+            [fakes.turn(done=False), fakes.turn(done=True, summary="done")]
+        ),
+        budget=Budget(max_turns=2, max_cost_usd=10.0),
+        wind_down_policy=WindDownPolicy(enabled=True),
+    )
+
+    result = await runner.run(initial_prompt="start")
+
+    assert result.success is False
+    assert "wind-down" in result.reason
+
+
+async def test_the_policy_off_leaves_the_run_untouched() -> None:
+    """The predictive path is strictly additive."""
+    runner = fakes.build_runner(
+        gateway=fakes.FakeAgentGateway([fakes.turn(done=True, summary="done")]),
+        budget=Budget(max_turns=2, max_cost_usd=10.0),
+    )
+
+    result = await runner.run(initial_prompt="start")
+
+    assert result.success is True
