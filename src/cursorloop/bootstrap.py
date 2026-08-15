@@ -81,13 +81,16 @@ def build_runner(
     resume_agent_id: str | None = None,
     client: Any | None = None,
     launch_bridge: Any | None = None,
+    run_id: str | None = None,
 ) -> BuiltRunner:
     """Assemble an AutonomousRunner for a fresh or resumed run.
 
     When the scripted test-agent gate is off and no ``client`` is supplied,
     launches ``CursorClient.launch_bridge(workspace=…)`` automatically.
     """
-    run_dir = RunDirectory.create(runs_root_for(cwd), cwd=cwd, plan_path=plan_path)
+    run_dir = RunDirectory.create(runs_root_for(cwd), cwd=cwd, plan_path=plan_path, run_id=run_id)
+    # Rebind to the resolved id: identical to the supplied one when the caller
+    # named the run, the freshly minted one otherwise.
     run_id = run_dir.read_meta().run_id
     trace_id = str(uuid.uuid4())
     state_root = cwd / ".cursorloop"
