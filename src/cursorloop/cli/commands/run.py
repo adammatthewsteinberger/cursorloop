@@ -23,6 +23,11 @@ def run(
         readable=True,
         help="Markdown plan file to seed a fresh agent run",
     ),
+    run_id: str | None = typer.Option(
+        None,
+        "--run-id",
+        help="Name this run instead of generating an id (lets a supervisor attach mid-run)",
+    ),
     cwd_dir: Path | None = typer.Option(
         None, "--cwd", exists=True, file_okay=False, help="Working directory"
     ),
@@ -44,6 +49,7 @@ def run(
     """Seed a Cursor Agent from PLAN and run autonomously to completion."""
     _run(
         plan=plan,
+        run_id=run_id,
         cwd_dir=cwd_dir,
         max_turns=max_turns,
         max_dollars=max_dollars,
@@ -60,6 +66,7 @@ def run(
 async def _run(
     *,
     plan: Path,
+    run_id: str | None,
     cwd_dir: Path | None,
     max_turns: int | None,
     max_dollars: float | None,
@@ -92,7 +99,16 @@ async def _run(
         raise typer.Exit(code=1) from exc
 
     try:
-        built = bootstrap.build_runner(cwd=cwd, config=config, plan_path=plan)
+        built = bootstrap.build_runner(cwd=cwd, config=config, plan_path=plan, run_id=run_id)
+    except ValueError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=2) from exc
+    except FileExistsError as exc:
+        typer.echo(
+            f"Run id {run_id!r} already exists; pick another or use `cursorloop resume`.",
+            err=True,
+        )
+        raise typer.Exit(code=2) from exc
     except RuntimeError as exc:
         typer.echo(str(exc))
         raise typer.Exit(code=1) from exc

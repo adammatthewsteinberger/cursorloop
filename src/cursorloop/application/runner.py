@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import contextlib
 import random
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import assert_never
@@ -40,13 +41,23 @@ from cursorloop.domain.completion import (
 )
 from cursorloop.domain.control import Stop
 from cursorloop.domain.faults import Busy, ConfigFault, TransientFault
+from cursorloop.domain.forecast import (
+    BurnRate,
+    CapacityForecast,
+    WindDownPolicy,
+    forecast,
+    should_wind_down,
+)
+from cursorloop.domain.handoff_marker import HandoffMarker
 from cursorloop.domain.loop import (
+    Decision,
     DelayThenSend,
     Finish,
     RunProbe,
     RunState,
     ScheduleProbe,
     SendTurn,
+    WindDownAndFinish,
     decide_after_probe,
     decide_after_turn,
     decide_preflight,
@@ -91,6 +102,8 @@ class RunnerContext:
     plan: WorkPlan | None = None
     continue_prompt: str = _CONTINUE_PROMPT
     done_marker: str = DEFAULT_DONE_MARKER
+    handoff_marker_writer: Callable[[HandoffMarker], object] | None = None
+    wind_down_policy: WindDownPolicy = field(default_factory=WindDownPolicy)
 
 
 class AutonomousRunner:
@@ -115,6 +128,8 @@ class AutonomousRunner:
         self._plan = ctx.plan
         self._continue_prompt = ctx.continue_prompt
         self._done_marker = ctx.done_marker
+        self._handoff_marker_writer = ctx.handoff_marker_writer
+        self._wind_down_policy = ctx.wind_down_policy
         self._first_turn = True
         self._credits_notified = False
         self._last_capacity: CapacityState | None = None
@@ -144,7 +159,7 @@ class AutonomousRunner:
 
             classified = await self._until_capacity()
             if isinstance(classified, Finish):
-                decision: SendTurn | RunProbe | ScheduleProbe | DelayThenSend | Finish = classified
+                decision: Decision = classified
             else:
                 self._maybe_notify_credits(classified)
                 state, decision = decide_preflight(
@@ -177,6 +192,8 @@ class AutonomousRunner:
                     decision = RunProbe()
                 elif isinstance(decision, RunProbe):
                     state, decision = await self._do_probe(state)
+                elif isinstance(decision, WindDownAndFinish):
+                    return self._finish_wound_down(state, decision, agent_id)
                 elif isinstance(decision, Finish):
                     result = self._finish(state, decision, agent_id)
                     return result
@@ -196,9 +213,7 @@ class AutonomousRunner:
             if result is not None:
                 self._reporter.finished(success=result.success, reason=result.reason)
 
-    async def _do_send(
-        self, state: RunState, initial_prompt: str
-    ) -> tuple[RunState, SendTurn | RunProbe | ScheduleProbe | DelayThenSend | Finish]:
+    async def _do_send(self, state: RunState, initial_prompt: str) -> tuple[RunState, Decision]:
         prompt = self._next_prompt(initial_prompt)
         self._attempt += 1
         self._reporter.turn_sent(attempt=self._attempt)
@@ -238,15 +253,25 @@ class AutonomousRunner:
             self._last_capacity = classified
             self._maybe_notify_credits(classified)
             verdict = self._verdict_for(outcome)
+            now = self._clock.now()
+            projection = self._project_capacity(state, capacity=classified, now=now)
+            wind_down = (
+                should_wind_down(
+                    projection, self._wind_down_policy, turns_spent=state.ledger.turns_spent + 1
+                )
+                if projection is not None
+                else None
+            )
             state, decision = decide_after_turn(
                 state,
                 capacity=classified,
                 verdict=verdict,
-                now=self._clock.now(),
+                now=now,
                 config=self._wait_policy,
                 tokens=outcome.tokens,
                 dollars=outcome.cost_usd,
                 started_at=self._started_at,
+                wind_down=wind_down,
             )
             if (
                 isinstance(decision, SendTurn)
@@ -273,9 +298,7 @@ class AutonomousRunner:
             )
             return state, decision
 
-    async def _do_probe(
-        self, state: RunState
-    ) -> tuple[RunState, SendTurn | RunProbe | ScheduleProbe | DelayThenSend | Finish]:
+    async def _do_probe(self, state: RunState) -> tuple[RunState, Decision]:
         previous = self._last_capacity
         classified = await self._until_capacity()
         if isinstance(classified, Finish):
@@ -409,6 +432,72 @@ class AutonomousRunner:
             wake = until if now + _SLEEP_CHUNK > until else now + _SLEEP_CHUNK
             await self._sleeper.sleep_until(wake)
         return False
+
+    def _project_capacity(
+        self, state: RunState, *, capacity: CapacityState, now: datetime
+    ) -> CapacityForecast | None:
+        """Forecast remaining capacity, but only while the vendor says we are
+        not already blocked.
+
+        This runner has no utilization producer, so the vendor dimension is
+        always unknown and only the budget dimensions carry a number. That is
+        the honest forecast for this vendor rather than a fabricated one.
+        """
+        if not isinstance(capacity, Available):
+            return None
+        turns = state.ledger.turns_spent + 1
+        projection = forecast(
+            capacity,
+            turns_spent=turns,
+            max_turns=self._budget.max_turns,
+            dollars_spent=state.ledger.dollars_spent,
+            max_dollars=self._budget.max_cost_usd,
+            observed=BurnRate(turns=turns, elapsed_seconds=0.0, dollars=state.ledger.dollars_spent),
+            capacity_as_of=now,
+            now=now,
+            policy=self._wind_down_policy,
+        )
+        self._log.debug(
+            "capacity.forecast",
+            headroom=projection.binding.fraction,
+            source=projection.binding.source,
+            turns_until_exhaustion=projection.turns_until_exhaustion,
+        )
+        return projection
+
+    def _finish_wound_down(
+        self, state: RunState, decision: WindDownAndFinish, agent_id: str
+    ) -> RunResult:
+        """Stop early, on purpose, so a successor can pick the work up.
+
+        Narrower than claudeloop's equivalent on purpose: this runner has no
+        save-point or snapshot helpers, and its snapshot sink still discards
+        the bundle it is handed. So the marker names the summary it can honestly
+        vouch for and nothing more -- a marker pointing at artifacts that were
+        never written is worse than a thin one.
+        """
+        binding = decision.forecast.binding
+        marker = HandoffMarker(
+            run_id=self._run_id,
+            reason=decision.reason,
+            produced_at=self._clock.now(),
+            headroom=binding.fraction,
+            headroom_source=binding.source,
+            resets_at=binding.resets_at,
+            session_id=agent_id,
+            turns_spent=state.ledger.turns_spent,
+            dollars_spent=state.ledger.dollars_spent,
+        )
+        if self._handoff_marker_writer is not None:
+            self._handoff_marker_writer(marker)
+        self._audit.record(
+            "wind_down",
+            {"reason": decision.reason, "headroom": binding.fraction, "source": binding.source},
+        )
+        self._log.info("run.wound_down", reason=decision.reason, headroom=binding.fraction)
+        return self._finish(
+            state, Finish(success=False, reason=f"wind-down: {decision.reason}"), agent_id
+        )
 
     def _finish(self, state: RunState, decision: Finish, agent_id: str) -> RunResult:
         self._audit.record(

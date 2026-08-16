@@ -9,6 +9,9 @@ on:
       - "src/cursorloop/infrastructure/api/**"
       - "tests/infrastructure/test_api_drift.py"
 
+permissions:
+  contents: read
+
 jobs:
   vendored-digest:
     runs-on: ubuntu-latest
