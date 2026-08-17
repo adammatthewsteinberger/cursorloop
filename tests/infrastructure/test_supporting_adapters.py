@@ -10,7 +10,17 @@ from pathlib import Path
 import anyio
 import pytest
 
-from cursorloop.domain.control import Prompt, SavePoint, SetCwd, SetEffort, SetModel, Snapshot, Stop
+from cursorloop.domain.control import (
+    Prompt,
+    SavePoint,
+    SetCwd,
+    SetEffort,
+    SetModel,
+    Snapshot,
+    Stop,
+    WindDown,
+)
+from cursorloop.domain.handoff_marker import HandoffMarker
 from cursorloop.infrastructure.audit import JsonlAuditLog
 from cursorloop.infrastructure.clock import AnyioSleeper, SystemClock
 from cursorloop.infrastructure.config import load_config
@@ -144,6 +154,31 @@ def test_rundir_create_list_resolve(tmp_path: Path) -> None:
         resolve_run_directory(tmp_path / "empty")
 
 
+def test_rundir_write_handoff_marker_atomic(tmp_path: Path) -> None:
+    """write_handoff_marker uses tmp + replace for crash safety."""
+    cwd = tmp_path / "ws"
+    cwd.mkdir()
+    root = runs_root_for(cwd)
+    run_dir = RunDirectory.create(root, cwd=cwd)
+    marker = HandoffMarker(
+        run_id="test-run",
+        reason="low headroom",
+        produced_at=datetime.now(UTC),
+        headroom=0.15,
+        headroom_source="budget.turns",
+        turns_spent=5,
+        dollars_spent=1.23,
+    )
+    result_path = run_dir.write_handoff_marker(marker)
+    assert result_path == run_dir.handoff_marker_path
+    assert run_dir.handoff_marker_path.is_file()
+    written = run_dir.handoff_marker_path.read_text(encoding="utf-8")
+    assert "test-run" in written
+    assert "low headroom" in written
+    # tmp file should not exist after successful write
+    assert not run_dir.handoff_marker_path.with_suffix(".json.tmp").exists()
+
+
 def test_control_enqueue_poll_and_stop_outranks(tmp_path: Path) -> None:
     control = FileRunControl(tmp_path / "inbox")
     control.enqueue(Prompt(text="go"))
@@ -152,22 +187,35 @@ def test_control_enqueue_poll_and_stop_outranks(tmp_path: Path) -> None:
     control.enqueue(SetCwd(path="/tmp"))
     control.enqueue(Snapshot())
     control.enqueue(SavePoint())
+    control.enqueue(WindDown(reason="low headroom"))
     control.enqueue(Stop())
     polled = control.poll()
     assert isinstance(polled[0], Stop)
-    assert {type(c) for c in polled[1:]} == {
+    assert isinstance(polled[1], Prompt)
+    assert {type(c) for c in polled} == {
+        Stop,
         Prompt,
         SetModel,
         SetEffort,
         SetCwd,
         Snapshot,
         SavePoint,
+        WindDown,
     }
     assert control.poll() == []
     bad = tmp_path / "inbox" / "1-bad.cmd.json"
     bad.write_text("{not-json", encoding="utf-8")
     assert control.poll() == []
     assert bad.is_file()
+
+
+def test_control_wind_down_round_trip(tmp_path: Path) -> None:
+    control = FileRunControl(tmp_path / "inbox")
+    control.enqueue(WindDown(reason="test reason"))
+    polled = control.poll()
+    assert len(polled) == 1
+    assert isinstance(polled[0], WindDown)
+    assert polled[0].reason == "test reason"
 
 
 def test_logging_configure_and_loggers(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:

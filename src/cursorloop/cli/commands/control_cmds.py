@@ -27,6 +27,21 @@ def stop(
     typer.echo(f"Stop requested for run {result.run_id}")
 
 
+def wind_down(
+    reason: str = typer.Option("operator wind-down", "--reason"),
+    run_id: str | None = typer.Option(None, "--run-id"),
+    cwd_dir: Path | None = typer.Option(None, "--cwd", exists=True, file_okay=False),
+) -> None:
+    """Request a wind-down: finish current turn, write handoff marker, exit 75."""
+    cwd = cwd_dir.resolve() if cwd_dir is not None else Path.cwd()
+    try:
+        result = run_control.enqueue_wind_down(cwd, reason, run_id)
+    except FileNotFoundError as exc:
+        typer.echo(str(exc), err=True)
+        raise typer.Exit(code=1) from exc
+    typer.echo(f"Wind-down requested for run {result.run_id}")
+
+
 def prompt(
     text: str = typer.Argument(..., help="Prompt text for the next turn"),
     run_id: str | None = typer.Option(None, "--run-id"),

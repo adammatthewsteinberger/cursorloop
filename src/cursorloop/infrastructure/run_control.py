@@ -14,6 +14,7 @@ from cursorloop.domain.control import (
     SetModel,
     Snapshot,
     Stop,
+    WindDown,
 )
 from cursorloop.infrastructure.control import FileRunControl
 from cursorloop.infrastructure.rundir import resolve_run_directory
@@ -57,3 +58,7 @@ def enqueue_snapshot(cwd: Path, run_id: str | None = None) -> EnqueueResult:
 
 def enqueue_savepoint(cwd: Path, run_id: str | None = None) -> EnqueueResult:
     return enqueue(cwd, SavePoint(), run_id)
+
+
+def enqueue_wind_down(cwd: Path, reason: str, run_id: str | None = None) -> EnqueueResult:
+    return enqueue(cwd, WindDown(reason=reason), run_id)

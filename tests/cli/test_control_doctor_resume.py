@@ -10,6 +10,7 @@ from typer.testing import CliRunner
 from cursorloop.application.dto import RunResult
 from cursorloop.cli.app import app
 from cursorloop.cli.render import exit_code_for
+from cursorloop.domain.handoff_marker import EXIT_WIND_DOWN
 from cursorloop.infrastructure.doctor_env import Finding
 from cursorloop.infrastructure.rundir import RunDirectory, runs_root_for
 
@@ -41,6 +42,8 @@ def test_exit_code_for_maps_known_reasons() -> None:
     }
     assert exit_code_for(RunResult(reason="Authentication failed", **base)) == 3
     assert exit_code_for(RunResult(reason="max wait exceeded", **base)) == 4
+    assert exit_code_for(RunResult(reason="wind-down: low headroom", **base)) == EXIT_WIND_DOWN
+    assert exit_code_for(RunResult(reason="wind-down: operator request", **base)) == 75
     assert exit_code_for(RunResult(reason="stopped by operator", **base)) == 130
     assert exit_code_for(RunResult(reason="budget exhausted", **base)) == 1
 
@@ -154,6 +157,30 @@ def test_stop_file_not_found_exits_one(tmp_path: Path) -> None:
         side_effect=FileNotFoundError("no cursorloop runs found"),
     ):
         result = runner.invoke(app, ["stop", "--cwd", str(tmp_path)])
+    assert result.exit_code == 1
+    combined = (result.stdout or "") + (result.stderr or "")
+    assert "no cursorloop runs" in combined
+
+
+def test_wind_down_enqueues_command_with_reason(tmp_path: Path) -> None:
+    run_dir = _run_dir(tmp_path)
+    result = runner.invoke(app, ["wind-down", "--reason", "test reason", "--cwd", str(tmp_path)])
+    assert result.exit_code == 0
+    assert "Wind-down requested" in result.stdout
+    assert run_dir.read_meta().run_id in result.stdout
+    inbox_files = list(run_dir.inbox.glob("*.cmd.json"))
+    assert len(inbox_files) == 1
+    payload = json.loads(inbox_files[0].read_text(encoding="utf-8"))
+    assert payload["type"] == "wind_down"
+    assert payload["reason"] == "test reason"
+
+
+def test_wind_down_file_not_found_exits_one(tmp_path: Path) -> None:
+    with patch(
+        "cursorloop.cli.commands.control_cmds.run_control.enqueue_wind_down",
+        side_effect=FileNotFoundError("no cursorloop runs found"),
+    ):
+        result = runner.invoke(app, ["wind-down", "--cwd", str(tmp_path)])
     assert result.exit_code == 1
     combined = (result.stdout or "") + (result.stderr or "")
     assert "no cursorloop runs" in combined

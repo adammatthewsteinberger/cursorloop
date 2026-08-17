@@ -11,7 +11,7 @@ from cursorloop.application.usecases.run_plan import run_from_plan_file
 from cursorloop.domain.autonomy import autonomy_preamble
 from cursorloop.domain.budget import Budget
 from cursorloop.domain.capacity import AuthenticationFailed, Available, CreditsExhausted
-from cursorloop.domain.control import Prompt, Stop
+from cursorloop.domain.control import Prompt, Stop, WindDown
 from cursorloop.domain.faults import Busy, ConfigFault, TransientFault
 from cursorloop.domain.forecast import WindDownPolicy
 from cursorloop.domain.handoff_marker import HandoffMarker
@@ -455,6 +455,37 @@ async def test_a_wind_down_without_a_writer_still_finishes_cleanly() -> None:
 
     assert result.success is False
     assert "wind-down" in result.reason
+
+
+async def test_wind_down_during_progress_wait_ends_the_run() -> None:
+    """Wind-down control command during a DelayThenSend wait should finish the run."""
+    gateway = fakes.FakeAgentGateway([fakes.turn(done=False, remaining_work=("waiting for CI",))])
+    control = fakes.FakeRunControl(script=[[], [WindDown(reason="test wind-down")]])
+    runner = fakes.build_runner(gateway=gateway, control=control)
+
+    result = await runner.run(initial_prompt="start")
+
+    assert result.success is False
+    assert "wind-down" in result.reason.lower()
+    assert "operator request" in result.reason
+
+
+async def test_wind_down_during_capacity_wait_ends_the_run() -> None:
+    """Wind-down control command during a ScheduleProbe wait should finish the run."""
+    probe = fakes.FakeCapacityProbe(
+        [fakes.signals_for(Available())]
+        + [fakes.signals_for(CreditsExhausted())] * 2
+        + [fakes.signals_for(Available())]
+    )
+    gateway = fakes.FakeAgentGateway([fakes.turn(capacity=CreditsExhausted())])
+    control = fakes.FakeRunControl(script=[[], [WindDown(reason="capacity wait wind-down")]])
+    runner = fakes.build_runner(gateway=gateway, probe=probe, control=control)
+
+    result = await runner.run(initial_prompt="start")
+
+    assert result.success is False
+    assert "wind-down" in result.reason.lower()
+    assert "operator request" in result.reason
 
 
 async def test_the_policy_off_leaves_the_run_untouched() -> None:

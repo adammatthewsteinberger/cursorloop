@@ -12,7 +12,7 @@ import random
 from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta
-from typing import assert_never
+from typing import Literal, assert_never
 
 from cursorloop.application.dto import RunResult, TurnOutcome
 from cursorloop.application.ports import (
@@ -39,7 +39,7 @@ from cursorloop.domain.completion import (
     evaluate,
     reconcile,
 )
-from cursorloop.domain.control import Stop
+from cursorloop.domain.control import Stop, WindDown
 from cursorloop.domain.faults import Busy, ConfigFault, TransientFault
 from cursorloop.domain.forecast import (
     BurnRate,
@@ -175,8 +175,12 @@ class AutonomousRunner:
                     state, decision = await self._do_send(state, initial_prompt)
                 elif isinstance(decision, DelayThenSend):
                     self._log.info("progress.wait", until=decision.at.isoformat())
-                    if await self._sleep_interruptible(decision.at):
+                    interrupt = await self._sleep_interruptible(decision.at)
+                    if interrupt == "stop":
                         decision = Finish(success=False, reason="stopped by operator")
+                        continue
+                    if interrupt == "wind_down":
+                        decision = Finish(success=False, reason="wind-down: operator request")
                         continue
                     decision = SendTurn()
                 elif isinstance(decision, ScheduleProbe):
@@ -186,8 +190,12 @@ class AutonomousRunner:
                         until=decision.at.isoformat(),
                         probe_count=state.probe_count,
                     )
-                    if await self._sleep_interruptible(decision.at):
+                    interrupt = await self._sleep_interruptible(decision.at)
+                    if interrupt == "stop":
                         decision = Finish(success=False, reason="stopped by operator")
+                        continue
+                    if interrupt == "wind_down":
+                        decision = Finish(success=False, reason="wind-down: operator request")
                         continue
                     decision = RunProbe()
                 elif isinstance(decision, RunProbe):
@@ -423,15 +431,24 @@ class AutonomousRunner:
         elif isinstance(capacity, Available):
             self._credits_notified = False
 
-    async def _sleep_interruptible(self, until: datetime) -> bool:
+    async def _sleep_interruptible(
+        self, until: datetime
+    ) -> None | Literal["stop"] | Literal["wind_down"]:
+        """Sleep until the given time, checking for control commands.
+
+        Returns None if the wait completed normally, "stop" if a Stop was received,
+        or "wind_down" if a WindDown was received.
+        """
         while self._clock.now() < until:
             for command in self._control.poll():
                 if isinstance(command, Stop):
-                    return True
+                    return "stop"
+                if isinstance(command, WindDown):
+                    return "wind_down"
             now = self._clock.now()
             wake = until if now + _SLEEP_CHUNK > until else now + _SLEEP_CHUNK
             await self._sleeper.sleep_until(wake)
-        return False
+        return None
 
     def _project_capacity(
         self, state: RunState, *, capacity: CapacityState, now: datetime

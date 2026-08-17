@@ -16,6 +16,8 @@ from cursorloop.domain.control import (
     SetModel,
     Snapshot,
     Stop,
+    WindDown,
+    stop_outranks,
 )
 
 
@@ -42,14 +44,7 @@ class FileRunControl:
                 continue
             else:
                 path.unlink(missing_ok=True)
-        return _stop_outranks(commands)
-
-
-def _stop_outranks(commands: list[ControlCommand]) -> list[ControlCommand]:
-    stops = [c for c in commands if isinstance(c, Stop)]
-    if stops:
-        return [stops[0], *[c for c in commands if not isinstance(c, Stop)]]
-    return commands
+        return stop_outranks(commands)
 
 
 def _command_to_payload(command: ControlCommand) -> dict[str, Any]:
@@ -67,6 +62,8 @@ def _command_to_payload(command: ControlCommand) -> dict[str, Any]:
         return {"type": "snapshot"}
     if isinstance(command, SavePoint):
         return {"type": "savepoint"}
+    if isinstance(command, WindDown):
+        return {"type": "wind_down", "reason": command.reason}
     raise TypeError(f"unsupported control command: {type(command)!r}")
 
 
@@ -86,4 +83,6 @@ def _payload_to_command(raw: dict[str, object]) -> ControlCommand:
         return Snapshot()
     if kind == "savepoint":
         return SavePoint()
+    if kind == "wind_down":
+        return WindDown(reason=str(raw["reason"]))
     raise ValueError(f"unknown control command type: {kind}")
