@@ -67,6 +67,6 @@ repos:
         args: [-q, -r, src/cursorloop]
       - id: import-linter
         name: import-linter (onion contract)
-        entry: lint-imports
+        entry: uv run lint-imports
         language: system
         pass_filenames: false
