@@ -68,4 +68,26 @@ class SavePoint:
     """Request a git savepoint at the next operator boundary."""
 
 
-ControlCommand = Stop | Prompt | SetModel | SetEffort | SetCwd | Snapshot | SavePoint
+@dataclass(frozen=True, slots=True)
+class WindDown:
+    """Request a wind-down: finish current turn, write handoff, exit 75."""
+
+    reason: str = "operator wind-down"
+
+    def __post_init__(self) -> None:
+        if not self.reason.strip():
+            raise ValueError("wind-down reason must not be blank")
+
+
+ControlCommand = Stop | Prompt | SetModel | SetEffort | SetCwd | Snapshot | SavePoint | WindDown
+
+
+def stop_outranks(commands: list[ControlCommand]) -> list[ControlCommand]:
+    """Stop always wins; a pending wind-down is held (not dropped) if stop arrives.
+
+    Ordering: stop first, then other commands (including wind-down).
+    """
+    stops = [c for c in commands if isinstance(c, Stop)]
+    if stops:
+        return [stops[0], *[c for c in commands if not isinstance(c, Stop)]]
+    return commands

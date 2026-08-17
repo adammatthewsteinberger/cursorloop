@@ -11,6 +11,8 @@ from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
+from cursorloop.domain.handoff_marker import HANDOFF_MARKER_FILENAME, HandoffMarker
+
 RUN_ID_PATTERN = re.compile(r"\A[A-Za-z0-9][A-Za-z0-9._-]{0,127}\Z")
 
 
@@ -81,6 +83,7 @@ class RunDirectory:
         self.bus_path = root / "bus.jsonl"
         self.savepoints_path = root / "savepoints.jsonl"
         self.stop_summary_path = root / "stop-summary.md"
+        self.handoff_marker_path = root / HANDOFF_MARKER_FILENAME
         self.lock_path = root / "run.lock"
 
     @classmethod
@@ -148,6 +151,13 @@ class RunDirectory:
     def write_stop_summary(self, markdown: str) -> Path:
         self.stop_summary_path.write_text(markdown, encoding="utf-8")
         return self.stop_summary_path
+
+    def write_handoff_marker(self, marker: HandoffMarker) -> Path:
+        """Write handoff marker atomically (tmp + rename) to guarantee completeness."""
+        tmp = self.handoff_marker_path.with_suffix(".json.tmp")
+        tmp.write_text(marker.to_json(), encoding="utf-8")
+        tmp.replace(self.handoff_marker_path)
+        return self.handoff_marker_path
 
     @property
     def resources_root(self) -> Path:

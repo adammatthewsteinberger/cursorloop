@@ -186,6 +186,7 @@ def build_runner(
         budget=budget,
         wait_policy=wait_policy,
         run_id=run_id,
+        handoff_marker_writer=run_dir.write_handoff_marker,
     )
     return BuiltRunner(
         runner=AutonomousRunner(ctx),

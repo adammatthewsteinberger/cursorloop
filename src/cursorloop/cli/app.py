@@ -20,6 +20,7 @@ from cursorloop.cli.commands.control_cmds import (
     stop,
     unwind,
     watch,
+    wind_down,
 )
 from cursorloop.cli.commands.doctor import doctor
 from cursorloop.cli.commands.resume import resume
@@ -41,6 +42,7 @@ app = typer.Typer(
 app.command(name="run")(run)
 app.command(name="resume")(resume)
 app.command(name="stop")(stop)
+app.command(name="wind-down")(wind_down)
 app.command(name="prompt")(prompt)
 app.command(name="status")(status)
 app.command(name="logs")(logs)
