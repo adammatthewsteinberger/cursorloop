@@ -164,9 +164,7 @@ def test_stop_file_not_found_exits_one(tmp_path: Path) -> None:
 
 def test_wind_down_enqueues_command_with_reason(tmp_path: Path) -> None:
     run_dir = _run_dir(tmp_path)
-    result = runner.invoke(
-        app, ["wind-down", "--reason", "test reason", "--cwd", str(tmp_path)]
-    )
+    result = runner.invoke(app, ["wind-down", "--reason", "test reason", "--cwd", str(tmp_path)])
     assert result.exit_code == 0
     assert "Wind-down requested" in result.stdout
     assert run_dir.read_meta().run_id in result.stdout

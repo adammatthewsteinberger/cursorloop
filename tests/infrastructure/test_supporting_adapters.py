@@ -20,6 +20,7 @@ from cursorloop.domain.control import (
     Stop,
     WindDown,
 )
+from cursorloop.domain.handoff_marker import HandoffMarker
 from cursorloop.infrastructure.audit import JsonlAuditLog
 from cursorloop.infrastructure.clock import AnyioSleeper, SystemClock
 from cursorloop.infrastructure.config import load_config
@@ -33,7 +34,6 @@ from cursorloop.infrastructure.logging import (
 from cursorloop.infrastructure.notify import StderrNotifier
 from cursorloop.infrastructure.progress import ConsoleProgressReporter
 from cursorloop.infrastructure.redact import redact
-from cursorloop.domain.handoff_marker import EXIT_WIND_DOWN, HandoffMarker
 from cursorloop.infrastructure.rundir import (
     RunDirectory,
     list_run_directories,

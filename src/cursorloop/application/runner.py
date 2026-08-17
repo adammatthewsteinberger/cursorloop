@@ -431,7 +431,9 @@ class AutonomousRunner:
         elif isinstance(capacity, Available):
             self._credits_notified = False
 
-    async def _sleep_interruptible(self, until: datetime) -> None | Literal["stop"] | Literal["wind_down"]:
+    async def _sleep_interruptible(
+        self, until: datetime
+    ) -> None | Literal["stop"] | Literal["wind_down"]:
         """Sleep until the given time, checking for control commands.
 
         Returns None if the wait completed normally, "stop" if a Stop was received,
