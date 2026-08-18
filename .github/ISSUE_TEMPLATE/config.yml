@@ -1,11 +1,11 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Architecture & roadmap
-    url: https://github.com/adammatthewsteinberger/cursorloop/blob/develop/docs/plans/architecture-and-roadmap.md
-    about: Design record and milestone plan for contributors.
+  - name: Documentation
+    url: https://adammatthewsteinberger.github.io/cursorloop/
+    about: Install, quickstart, guides, architecture, and contributor docs.
   - name: Question / discussion
     url: https://github.com/adammatthewsteinberger/cursorloop/discussions
-    about: For general questions rather than a specific bug or feature request.
+    about: For general questions or design discussion rather than a specific bug or feature request.
   - name: Security vulnerability
     url: https://github.com/adammatthewsteinberger/cursorloop/security/advisories/new
-    about: Report security vulnerabilities privately — see SECURITY.md. Do not open a public issue.
+    about: Please report security vulnerabilities privately — see SECURITY.md. Do not open a public issue.
