@@ -112,7 +112,16 @@ def build_runner(
     audit = JsonlAuditLog(run_dir.audit_path, run_id=run_id)
     profile = resolve_profile(config)
 
-    scripted = resolve_test_agent_from_env()
+    def _forward_event_to_sink(event: dict[str, object]) -> None:
+        """Adapt scripted agent's dict-format events to RunEventSink.emit calls."""
+        event_dict = dict(event)
+        event_type = event_dict.pop("type", "unknown")
+        if not isinstance(event_type, str):
+            event_type = str(event_type)
+        payload = dict(event_dict.items())
+        event_sink.emit(event_type, payload)
+
+    scripted = resolve_test_agent_from_env(on_event=_forward_event_to_sink)
     gateway: AgentGateway
     probe: CapacityProbe
     bridge: LiveBridge | None = None
