@@ -23,6 +23,7 @@ from cursorloop.infrastructure.agent.scripted import (
 )
 from cursorloop.infrastructure.audit import JsonlAuditLog
 from cursorloop.infrastructure.control import FileRunControl
+from cursorloop.infrastructure.events import JsonlRunEventSink
 from cursorloop.infrastructure.lock import FileAgentLock
 from cursorloop.infrastructure.logging import NullAppLogger
 from cursorloop.infrastructure.notify import StderrNotifier
@@ -53,6 +54,11 @@ class SystemEnv:
         lines = self.run_dir.audit_path.read_text(encoding="utf-8").splitlines()
         return [json.loads(line) for line in lines if line.strip()]
 
+    def run_events(self) -> list[dict[object, object]]:
+        assert self.run_dir is not None
+        lines = self.run_dir.events_path.read_text(encoding="utf-8").splitlines()
+        return [json.loads(line) for line in lines if line.strip()]
+
     def state(self) -> dict[str, object]:
         assert self.run_dir is not None
         store = FileRunStateStore(self.workspace / ".cursorloop")
@@ -77,6 +83,7 @@ class SystemEnv:
             runs_root_for(self.workspace), cwd=self.workspace, plan_path=plan
         )
         run_id = self.run_dir.read_meta().run_id
+        trace_id = "test-trace-id"
         control = FileRunControl(self.run_dir.inbox)
         if pre_enqueue_stop:
             control.enqueue(Stop())
@@ -85,6 +92,17 @@ class SystemEnv:
         if max_wait is not None:
             seconds = float(max_wait.rstrip("s"))
             wait = wait.with_max_wait(timedelta(seconds=seconds))
+
+        event_sink = JsonlRunEventSink(self.run_dir.events_path, run_id=run_id, trace_id=trace_id)
+
+        def _forward_event_to_sink(event: dict[str, object]) -> None:
+            """Adapt scripted agent's dict-format events to RunEventSink.emit calls."""
+            event_dict = dict(event)
+            event_type = event_dict.pop("type", "unknown")
+            if not isinstance(event_type, str):
+                event_type = str(event_type)
+            payload = dict(event_dict.items())
+            event_sink.emit(event_type, payload)
 
         class _NullHooks:
             def install(self) -> None:
@@ -97,7 +115,7 @@ class SystemEnv:
                 return False
 
         ctx = RunnerContext(
-            gateway=ScriptedAgentGateway(list(agent_script.turns)),
+            gateway=ScriptedAgentGateway(list(agent_script.turns), on_event=_forward_event_to_sink),
             probe=ScriptedCapacityProbe(list(agent_script.probes)),
             clock=self.clock,
             sleeper=self.sleeper,
