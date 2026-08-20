@@ -43,3 +43,35 @@ def test_max_wait_exceeded_exits_4_with_a_named_reason(system_env) -> None:
 def test_resume_after_stall(system_env) -> None:
     result = system_env.run(script="stall_then_recover.json")
     assert result.exit_code == 0
+
+
+def test_scripted_run_populates_events_jsonl(system_env) -> None:
+    """Scripted runs write raw_events to events.jsonl via the event sink."""
+    result = system_env.run(script="done.json")
+    assert result.exit_code == 0
+    # Verify events.jsonl was created and populated
+    assert system_env.run_dir is not None
+    events_file = system_env.run_dir.events_path
+    assert events_file.exists()
+    assert events_file.stat().st_size > 0
+    # Parse and validate events
+    events = system_env.run_events()
+    assert len(events) == 4  # 4 raw_events from done.json fixture
+    # Every event must have the core fields
+    for event in events:
+        assert "ts" in event
+        assert "run_id" in event
+        assert "event_type" in event
+        assert event["run_id"] == system_env.run_dir.read_meta().run_id
+    # Verify event types match the fixture
+    event_types = [e["event_type"] for e in events]
+    assert event_types.count("tool_call") == 2
+    assert event_types.count("status") == 1
+    assert event_types.count("usage") == 1
+    # Verify payloads were preserved correctly
+    tool_events = [e for e in events if e["event_type"] == "tool_call"]
+    assert tool_events[0]["payload"]["name"] == "Read"
+    assert tool_events[0]["payload"]["status"] == "started"
+    assert tool_events[1]["payload"]["status"] == "completed"
+    usage_events = [e for e in events if e["event_type"] == "usage"]
+    assert usage_events[0]["payload"]["total_tokens"] == 150
