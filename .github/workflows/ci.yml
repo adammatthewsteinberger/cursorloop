@@ -88,29 +88,17 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - run: python -m pip install --upgrade pip
       - run: pip install -e ".[dev]"
-      - name: Domain coverage floor (100%)
-        run: >
-          pytest tests
-          --cov=cursorloop.domain
-          --cov-report=term-missing
-          --cov-fail-under=100
-      - name: Application coverage floor (100%)
-        run: >
-          pytest tests
-          --cov=cursorloop.application
-          --cov-report=term-missing
-          --cov-fail-under=100
-      - name: Infrastructure coverage floor (100%)
-        run: >
-          pytest tests
-          --cov=cursorloop.infrastructure
-          --cov-report=term-missing
-          --cov-fail-under=100
-      - name: CLI coverage floor (100%)
-        run: >
-          pytest tests
-          --cov=cursorloop.cli
-          --cov-report=term-missing
-          --cov-fail-under=100
+      # One instrumented run feeds all four floors. `coverage report
+      # --include=` filters the written data file per layer, so each floor
+      # keeps an independent verdict without re-running the suite. The full
+      # suite IS this run: 5 executions -> 1, ~15s -> ~5s.
       - name: Full suite
-        run: pytest
+        run: pytest tests --cov=cursorloop --cov-branch --cov-report=
+      - name: Domain coverage floor (100%)
+        run: coverage report --include='src/cursorloop/domain/*' --fail-under=100
+      - name: Application coverage floor (100%)
+        run: coverage report --include='src/cursorloop/application/*' --fail-under=100
+      - name: Infrastructure coverage floor (100%)
+        run: coverage report --include='src/cursorloop/infrastructure/*' --fail-under=100
+      - name: CLI coverage floor (100%)
+        run: coverage report --include='src/cursorloop/cli/*' --fail-under=100
