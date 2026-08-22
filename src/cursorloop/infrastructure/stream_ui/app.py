@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Textual stream UI sketch — fed from on_delta / on_step (M5)."""
 
 from __future__ import annotations

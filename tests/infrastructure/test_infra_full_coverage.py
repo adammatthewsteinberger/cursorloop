@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Drive remaining infrastructure coverage gaps to 100%."""
 
 from __future__ import annotations

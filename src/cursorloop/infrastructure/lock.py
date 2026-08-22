@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """AgentLock — advisory exclusive create under ``.cursorloop/locks/``."""
 
 from __future__ import annotations

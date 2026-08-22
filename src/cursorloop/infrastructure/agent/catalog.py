@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Resolved agent handles via ``client.agents.list/get/list_runs``.
 
 Local persistence is workspace-scoped. Always pass ``cwd=`` on local list/get

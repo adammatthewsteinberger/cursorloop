@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Notifier — loud stderr banner when a human must act (e.g. credits)."""
 
 from __future__ import annotations

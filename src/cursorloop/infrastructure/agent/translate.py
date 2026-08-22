@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Translate Cursor SDK runs and errors into TurnSignals / TurnOutcome.
 
 Duck-typed on purpose: every SDK attribute is read with ``getattr(..., None)``

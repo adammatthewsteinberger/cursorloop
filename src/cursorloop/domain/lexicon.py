@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Configurable billing and rate-limit substring lexicons for classification."""
 
 from __future__ import annotations

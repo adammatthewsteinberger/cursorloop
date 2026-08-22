@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Budget guardrails for an unattended, potentially multi-hour/multi-day run.
 
 Tokens are the enforceable hard cap. ``cost is None`` from ``get_usage()`` means

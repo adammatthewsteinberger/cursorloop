@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """structlog configuration: human console + JSON console + optional JSON file.
 
 Redaction runs in the shared processor chain before any renderer. Bound fields
