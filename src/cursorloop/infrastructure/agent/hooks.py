@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Managed autonomy fragment for ``.cursor/hooks.json``.
 
 Cursor hooks are file-based only. Scripts live under the run state dir; we

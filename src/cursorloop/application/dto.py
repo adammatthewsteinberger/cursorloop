@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Data transfer objects passed between application/ and adapters.
 
 Not domain value objects — these carry the raw shape of one agent turn

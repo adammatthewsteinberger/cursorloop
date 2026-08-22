@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Agent reference and selection value objects."""
 
 from __future__ import annotations

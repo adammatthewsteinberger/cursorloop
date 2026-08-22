@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Write a handoff snapshot under the run directory."""
 
 from __future__ import annotations

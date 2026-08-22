@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Domain-level errors raised by pure logic and use cases."""
 
 from __future__ import annotations

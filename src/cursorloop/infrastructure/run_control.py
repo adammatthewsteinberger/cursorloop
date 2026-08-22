@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Enqueue mid-run control commands into a run directory inbox."""
 
 from __future__ import annotations

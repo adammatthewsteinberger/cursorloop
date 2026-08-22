@@ -47,6 +47,10 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
+    # Release automation and provenance guardrails, shared by every repo in
+    # the family. Stdlib-only, so adopting it in five places multiplies
+    # nobody's dependency tree.
+    "vibey-gh>=1.2",
     "pytest>=8.0",
     "pytest-cov>=5.0",
     "pytest-asyncio>=0.24",

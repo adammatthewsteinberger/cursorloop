@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Recursive redaction of secret-shaped keys and Cursor credential strings.
 
 Used as a structlog processor and by audit/event sinks so credential masking

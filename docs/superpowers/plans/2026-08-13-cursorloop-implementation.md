@@ -395,14 +395,14 @@ def test_lexicon_is_overridable() -> None:
 ```python
 @dataclass(frozen=True, slots=True)
 class TurnSignals:
-    error_type: str | None = None       # class name, e.g. "RateLimitError"
-    error_code: str | None = None       # CursorAgentError.code
+    error_type: str | None = None  # class name, e.g. "RateLimitError"
+    error_code: str | None = None  # CursorAgentError.code
     proto_error_code: str | None = None
     error_message: str = ""
-    http_status: int | None = None      # status_code
+    http_status: int | None = None  # status_code
     is_retryable: bool | None = None
     retry_after: str | None = None
-    run_status: str | None = None       # "finished"|"error"|"cancelled"|"expired"|"running"
+    run_status: str | None = None  # "finished"|"error"|"cancelled"|"expired"|"running"
     result_text: str = ""
     request_id: str | None = None
 ```
@@ -468,9 +468,7 @@ def test_retryable_rate_limit_with_seconds_is_a_window() -> None:
     signals = TurnSignals(
         error_type="RateLimitError", is_retryable=True, retry_after="120", http_status=429
     )
-    assert classify(signals, now=NOW) == WindowExhausted(
-        "rate_limit", NOW + timedelta(seconds=120)
-    )
+    assert classify(signals, now=NOW) == WindowExhausted("rate_limit", NOW + timedelta(seconds=120))
 
 
 def test_retryable_rate_limit_without_header_is_an_unscheduled_window() -> None:
@@ -1002,9 +1000,7 @@ def test_repeated_probes_increment_the_count_and_keep_the_original_start() -> No
         start(LEDGER), capacity=CreditsExhausted(), verdict=Continue(), now=NOW
     )
     for i in range(1, 4):
-        state, _ = decide_after_probe(
-            state, CreditsExhausted(), now=NOW + timedelta(minutes=2 * i)
-        )
+        state, _ = decide_after_probe(state, CreditsExhausted(), now=NOW + timedelta(minutes=2 * i))
         assert state.probe_count == i
         assert state.started_waiting_at == NOW
 
@@ -1147,9 +1143,7 @@ def test_runner_resumes_on_the_probe_that_finds_a_credit_top_up() -> None:
     """The scenario the whole project exists for: five probes still exhausted,
     the sixth finds capacity, and the run resumes THERE — not at some invented
     deadline, because CreditsExhausted has no deadline to invent."""
-    probe = fakes.FakeCapacityProbe(
-        [CreditsExhausted()] * 5 + [Available()]
-    )
+    probe = fakes.FakeCapacityProbe([CreditsExhausted()] * 5 + [Available()])
     gateway = fakes.FakeAgentGateway(
         [fakes.turn(capacity=CreditsExhausted()), fakes.turn(done=True, summary="finished")]
     )
