@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Configuration: CLI/env/file/defaults. Only ``CURSORLOOP_*`` and ``CURSOR_API_KEY``.
 
 Vendor-foreign env prefixes are ignored. Config files use stdlib ``tomllib``.

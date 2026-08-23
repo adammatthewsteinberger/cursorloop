@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 from __future__ import annotations
 
 from cursor_sdk import AgentDefinition, ModelSelection, SandboxOptions, StdioMcpServerConfig

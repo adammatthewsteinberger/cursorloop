@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Pinned Cloud Agents OpenAPI digest and registered operation ids."""
 
 from __future__ import annotations

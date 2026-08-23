@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Automatic model escalate and cost-aware downgrade — pure decisions.
 
 Escalation always emits a matching ``restore`` profile because Cursor per-run

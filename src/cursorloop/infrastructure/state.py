@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """RunStateStore — persists per-run JSON with atomic write-then-rename."""
 
 from __future__ import annotations

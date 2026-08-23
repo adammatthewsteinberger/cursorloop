@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """cursorloop infrastructure.api — Cloud Agents REST sketch (M4)."""
 
 from __future__ import annotations

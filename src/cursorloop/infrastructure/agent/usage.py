@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Per-turn tokens and billed dollars from ``agent.get_usage()``.
 
 ``cost is None`` means UNKNOWN, never zero. Returning ``0.0`` for an
