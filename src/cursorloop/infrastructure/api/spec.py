@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Load and digest-assert the vendored Cloud Agents OpenAPI document."""
 
 from __future__ import annotations

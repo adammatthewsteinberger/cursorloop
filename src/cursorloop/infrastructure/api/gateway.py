@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """HTTP gateway for Cloud Agents REST calls (Bearer + redaction)."""
 
 from __future__ import annotations

@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Synthetic TurnSignals builders for classifier tests.
 
 Each builder is **synthetic**, derived from documented ``CursorAgentError``

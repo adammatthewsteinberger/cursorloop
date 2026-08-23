@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Parse HTTP Retry-After header values into absolute datetimes."""
 
 from __future__ import annotations

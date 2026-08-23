@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Doctor use case — offline error classification (stdlib + domain only)."""
 
 from __future__ import annotations

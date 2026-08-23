@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Real Clock and Sleeper adapters. Test doubles live under tests/, never here."""
 
 from __future__ import annotations

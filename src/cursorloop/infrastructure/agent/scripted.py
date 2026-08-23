@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """JSON-scripted AgentGateway / CapacityProbe for system-live tests.
 
 Activated only when both ``CURSORLOOP_ALLOW_TEST_AGENT=1`` and

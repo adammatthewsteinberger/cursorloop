@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Adaptive wait policy — the next instant to probe, never a duration to sleep.
 
 Credits exhaustion has no reset time, so the policy probes on a bounded

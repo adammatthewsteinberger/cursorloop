@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Doctor findings — environment checks for unattended readiness."""
 
 from __future__ import annotations

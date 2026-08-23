@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Durable Cursor Agent gateway: one send_turn maps to one agent.send() → Run.
 
 Per-run model overrides are sticky. The gateway re-asserts the active profile

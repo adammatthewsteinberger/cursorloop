@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Composition root — the only module permitted to know about every layer.
 
 Wires concrete infrastructure adapters into application ports and hands the

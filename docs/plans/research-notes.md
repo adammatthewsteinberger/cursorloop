@@ -415,10 +415,11 @@ class AgentUsage:
     runs: Sequence[RunUsage] = ()
     cost: UsageCost | None = None
 
+
 @dataclass(frozen=True)
 class UsageCost:
-    raw_cost_cents: float   # undiscounted model token cost; 0 for request-priced usage
-    charged_cents: float    # amount charged, discounts + Cursor Token Rate included
+    raw_cost_cents: float  # undiscounted model token cost; 0 for request-priced usage
+    charged_cents: float  # amount charged, discounts + Cursor Token Rate included
 ```
 
 Cloud agents return a per-run breakdown; local agents return a per-turn
@@ -1127,6 +1128,7 @@ The SDK-visible surface for all of this is `ModelSelection`:
 class ModelSelection:
     id: str
     params: Sequence[ModelParameterValue] = ()
+
 
 @dataclass(frozen=True)
 class ModelParameterValue:

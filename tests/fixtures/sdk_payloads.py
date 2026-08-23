@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Synthetic Cursor SDK payload builders for translate tests.
 
 Each builder is **synthetic**, derived from documented dataclass shapes, and

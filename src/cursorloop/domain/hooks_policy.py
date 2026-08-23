@@ -1,3 +1,4 @@
+# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Pure builders for the managed autonomy ``hooks.json`` fragment.
 
 Cursor hooks are file-based only. These payloads are what generated scripts
