@@ -1,5 +1,4 @@
 # Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
-# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Gateway-local faults that are deliberately not capacity states.
 
 These values must never reach the capacity wait policy. They are handled in the

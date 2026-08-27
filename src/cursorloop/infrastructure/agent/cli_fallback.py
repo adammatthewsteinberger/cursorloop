@@ -1,5 +1,4 @@
 # Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
-# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Optional AgentGateway that shells out to ``agent -p`` (never shell=True).
 
 Primary path remains the Cursor Python SDK. This adapter exists so the

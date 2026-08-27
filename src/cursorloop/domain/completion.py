@@ -1,5 +1,4 @@
 # Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
-# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Completion verdicts from a fenced JSON block, a marker, or an empty turn.
 
 Cursor has no vendor structured-output schema, so completion is a four-tier

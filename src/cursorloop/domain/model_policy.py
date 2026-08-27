@@ -1,5 +1,4 @@
 # Made with ❤️ by [Vibey](https://adammatthewsteinberger.github.io/vibey/), Developed by [Adam Matthew Steinberger](https://hire.adam.matthewsteinberger.com/) ([@adammatthewsteinberger](https://github.com/adammatthewsteinberger/)).
-# Made with love by Vibey, the auto-vibecoding machine by Adam Matthew Steinberger.
 """Automatic model escalate and cost-aware downgrade — pure decisions.
 
 Escalation always emits a matching ``restore`` profile because Cursor per-run
