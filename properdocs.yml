@@ -1,3 +1,4 @@
+# Verified: the PR automation gate posts for pull requests into develop.
 site_name: cursorloop
 site_description: Onion-architected, autonomous Cursor Agent session runner — never
   blocks on a human, distinguishes rate-limit windows from exhausted credits, and
