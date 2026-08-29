@@ -23,7 +23,7 @@ API-key env var); the default test suite needs no account.
 ## The branch model (gitflow)
 
 ```
-main         ← always releasable; release-please opens release PRs against this
+main         ← always releasable; vibey-gh promotes develop into this
   ▲ (merge commit — preserves individual conventional commits)
 develop      ← integration branch; feature branches target this
   ▲ (squash-merge — one conventional-commit-titled squash per feature)
@@ -37,10 +37,8 @@ feature/*    ← your work
 4. Your feature branch is **squash-merged** into `develop` — give the squash
    title a conventional-commit-formatted summary of the whole PR.
 5. Periodically, `develop` is merged into `main` as a **merge commit**.
-   release-please maintains a standing release PR on `main`; merging *that*
-   is what cuts a version and publishes to PyPI. TestPyPI dry-runs are a
-   manual `workflow_dispatch` that always builds `develop`. See
-   [`docs/contributing/release.md`](docs/contributing/release.md).
+   vibey-gh promotes develop into main with a derived version bump; the push
+   to main publishes to PyPI. See docs/contributing/release.md.
 
 Never implement on `main`.
 
