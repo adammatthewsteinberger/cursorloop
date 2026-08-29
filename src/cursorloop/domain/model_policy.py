@@ -5,6 +5,10 @@ Escalation always emits a matching ``restore`` profile because Cursor per-run
 model overrides are sticky: a one-off escalation that is not followed by an
 explicit de-escalation bills every later turn at the higher rate. Downgrades
 are lasting cost-control changes and do not restore.
+
+Not yet called from the run loop or runner — ``decide_auto_model`` is fully
+implemented and tested but has no caller today, so model selection remains
+manual (see ``docs/guides/model-profiles.md``) until it is wired in.
 """
 
 from __future__ import annotations

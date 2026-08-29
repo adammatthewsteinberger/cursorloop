@@ -9,7 +9,11 @@ import typer
 from cursorloop.infrastructure import run_control
 from cursorloop.infrastructure.agent.hooks import ManagedHooks
 from cursorloop.infrastructure.git_savepoints import GitSavePointStore
-from cursorloop.infrastructure.rundir import list_run_directories, resolve_run_directory
+from cursorloop.infrastructure.rundir import (
+    is_run_active,
+    list_run_directories,
+    resolve_run_directory,
+)
 from cursorloop.infrastructure.snapshot import FileRunSnapshotSink
 from cursorloop.infrastructure.stream_ui import StreamUiApp
 
@@ -119,8 +123,15 @@ def unwind(
 ) -> None:
     cwd = cwd_dir.resolve() if cwd_dir is not None else Path.cwd()
     directory = resolve_run_directory(cwd, run_id)
+    meta = directory.read_meta()
+    if is_run_active(meta):
+        typer.echo(
+            f"Refusing to unwind: run {meta.run_id} is still active (pid {meta.pid})",
+            err=True,
+        )
+        raise typer.Exit(code=1)
     store = GitSavePointStore(cwd=cwd, index_path=directory.savepoints_path)
-    store.unwind(run_id=directory.read_meta().run_id, to=to, backup=True)
+    store.unwind(run_id=meta.run_id, to=to, backup=True)
     typer.echo(f"Unwound to {to}")
 
 

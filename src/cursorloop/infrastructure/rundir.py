@@ -192,6 +192,11 @@ def _pid_alive(pid: int) -> bool:
     return True
 
 
+def is_run_active(meta: RunMeta) -> bool:
+    """True when ``meta`` reflects a run whose process is still executing."""
+    return meta.status == "active" and _pid_alive(meta.pid)
+
+
 def resolve_run_directory(cwd: Path, run_id: str | None = None) -> RunDirectory:
     """Resolve an explicit run id, else the most recent active (live pid) run."""
     if run_id is not None:
@@ -201,7 +206,7 @@ def resolve_run_directory(cwd: Path, run_id: str | None = None) -> RunDirectory:
     candidates = list_run_directories(cwd)
     for directory in reversed(candidates):
         meta = directory.read_meta()
-        if meta.status == "active" and _pid_alive(meta.pid):
+        if is_run_active(meta):
             return directory
     if candidates:
         return candidates[-1]

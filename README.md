@@ -7,11 +7,6 @@
 [![Docs](https://github.com/adammatthewsteinberger/cursorloop/actions/workflows/release-surfaces.yml/badge.svg)](https://adammatthewsteinberger.github.io/cursorloop/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/adammatthewsteinberger/cursorloop/blob/develop/LICENSE)
 
-**Onion-architected, autonomous Cursor Agent session runner** — Composer-first
-(`composer-2.5`; Grok is a secondary model profile, not a product). Never
-blocks on a human, distinguishes a waitable rate-limit window from
-non-waitable exhausted credits, and resumes safely across usage windows.
-
 ## What problem this solves
 
 Cursor Agent sessions hit usage limits. A single agent turn ending doesn't
@@ -26,6 +21,13 @@ never a hang past a fabricated reset.
 
 `cursorloop` exists to get all three of those distinctions right,
 automatically, so you can hand it a plan and walk away.
+
+## What cursorloop is
+
+**Onion-architected, autonomous Cursor Agent session runner** — Composer-first
+(`composer-2.5`; Grok is a secondary model profile, not a product). Never
+blocks on a human, distinguishes a waitable rate-limit window from
+non-waitable exhausted credits, and resumes safely across usage windows.
 
 It is a deliberate transplant of the [claudeloop](https://github.com/adammatthewsteinberger/claudeloop)
 design — same state machine, same ports, same run-directory layout —

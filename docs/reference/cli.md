@@ -32,7 +32,7 @@ against that registry, not aspiration.
 | `cursorloop savepoints` | List git savepoints the loop created. |
 | `cursorloop snapshot` | Record a savepoint of the working tree now. |
 | `cursorloop unwind` | Roll the working tree back to a savepoint (refuses while a run is active). |
-| `cursorloop reset` | Wipe the local `.cursorloop/` control plane. |
+| `cursorloop reset` | Restore managed hooks after a crashed run. |
 
 ## Environment
 

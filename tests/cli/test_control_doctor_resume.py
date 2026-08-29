@@ -227,6 +227,7 @@ def test_snapshot_none_ref_is_silent(tmp_path: Path) -> None:
 
 def test_savepoints_and_unwind(tmp_path: Path) -> None:
     directory = _run_dir(tmp_path)
+    directory.update_meta(status="finished")
     cwd = str(tmp_path)
     run_id = directory.read_meta().run_id
     point = SimpleNamespace(n=1, sha="abcdef1234567890", label="t1")
@@ -243,6 +244,20 @@ def test_savepoints_and_unwind(tmp_path: Path) -> None:
         )
         assert unwound.exit_code == 0
         store.unwind.assert_called_once()
+
+
+def test_unwind_refuses_while_run_active(tmp_path: Path) -> None:
+    directory = _run_dir(tmp_path)
+    run_id = directory.read_meta().run_id
+    assert directory.read_meta().status == "active"
+
+    with patch("cursorloop.cli.commands.control_cmds.GitSavePointStore") as store_cls:
+        result = runner.invoke(
+            app,
+            ["unwind", "--to", "abcdef1234567890", "--cwd", str(tmp_path), "--run-id", run_id],
+        )
+        assert result.exit_code != 0
+        store_cls.return_value.unwind.assert_not_called()
 
 
 def test_resume_success_and_failure(tmp_path: Path) -> None:

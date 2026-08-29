@@ -21,6 +21,8 @@ flowchart TD
         CapacityADT[Capacity ADT + waiting policy]
         Ledger[Budget ledger - max_dollars]
         Verdicts[Completion verdicts: fence, marker, empty-turn, reconciliation]
+        Forecast[Capacity forecast + WindDownPolicy - measurement only, off by default]
+        ModelPolicy[Auto model escalate/downgrade policy - implemented, not wired into the runner]
     end
 
     subgraph Infrastructure[Infrastructure adapters]
@@ -70,6 +72,9 @@ flowchart TD
     Loop --> CapacityADT
     Loop --> Ledger
     Loop --> Verdicts
+    CapacityADT --> Forecast
+    Ledger --> Forecast
+    ModelPolicy -.->|not yet called by Loop or runner| Loop
     Ports --> AgentT
     Ports --> CloudApi
     Ports --> Cfg
