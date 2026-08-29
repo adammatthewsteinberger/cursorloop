@@ -4,7 +4,7 @@
 [![PyPI downloads](https://img.shields.io/pypi/dm/cursorloop)](https://pypi.org/project/cursorloop/)
 [![Python versions](https://img.shields.io/pypi/pyversions/cursorloop)](https://pypi.org/project/cursorloop/)
 [![CI](https://github.com/adammatthewsteinberger/cursorloop/actions/workflows/ci.yml/badge.svg)](https://github.com/adammatthewsteinberger/cursorloop/actions/workflows/ci.yml)
-[![Docs](https://github.com/adammatthewsteinberger/cursorloop/actions/workflows/docs.yml/badge.svg)](https://adammatthewsteinberger.github.io/cursorloop/)
+[![Docs](https://github.com/adammatthewsteinberger/cursorloop/actions/workflows/release-surfaces.yml/badge.svg)](https://adammatthewsteinberger.github.io/cursorloop/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://github.com/adammatthewsteinberger/cursorloop/blob/develop/LICENSE)
 
 **Onion-architected, autonomous Cursor Agent session runner** — Composer-first
@@ -100,7 +100,7 @@ is in the [`docs/`](https://github.com/adammatthewsteinberger/cursorloop/tree/de
 | [CLI reference](https://adammatthewsteinberger.github.io/cursorloop/reference/cli/) | `cursorloop --help` and `cursorloop --man` |
 | [Contributing](https://adammatthewsteinberger.github.io/cursorloop/contributing/development/) | Development setup, testing, docs, [release](https://adammatthewsteinberger.github.io/cursorloop/contributing/release/) |
 | [Plans](https://github.com/adammatthewsteinberger/cursorloop/tree/develop/docs/plans) | Design record, vendor research notes, and the shared transplant outline (GitHub tree; not in the site nav) |
-| [Changelog](https://github.com/adammatthewsteinberger/cursorloop/blob/develop/CHANGELOG.md) | Release notes, maintained by release-please |
+| [Changelog](https://github.com/adammatthewsteinberger/cursorloop/blob/develop/CHANGELOG.md) | Release notes, versions derived and published by vibey-gh at promotion |
 
 ## Project status
 
